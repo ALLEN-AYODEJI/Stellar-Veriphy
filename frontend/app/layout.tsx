@@ -17,6 +17,7 @@ import { ThemeProvider } from "@/components/ThemeProvider";
 import { ToastProvider } from "@/components/ToastProvider";
 import { HelpSearchOverlay } from "@/components/ui/HelpSearchOverlay";
 import { ScrollToTop } from "@/components/ui/ScrollToTop";
+import { RouteScrollRestoration } from "@/components/ui/RouteScrollRestoration";
 import { TutorialOverlay } from "@/components/ui/TutorialOverlay";
 // #442 — import centralised constants instead of duplicating them here
 import { SITE_DESCRIPTION, SITE_NAME, SITE_URL } from "@/config/app";
@@ -106,6 +107,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                             </ErrorBoundary>
                           </ErrorBoundary>
                           <ScrollToTop />
+                          <RouteScrollRestoration />
                           <HelpSearchOverlay />
                           <TutorialOverlay />
                           <PWAInstallPrompt />

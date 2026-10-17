@@ -53,10 +53,10 @@ button.link { border: 0; background: none; color: var(--accent); padding: 0; tex
 .job-header { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; }
 
 .badge { font-size: 0.8rem; font-weight: 600; padding: 0.1rem 0.6rem; border-radius: 999px; }
-.badge-pending { background: #e9ecef; color: #495057; }
-.badge-processing { background: #dbe4ff; color: var(--accent); }
-.badge-certified { background: var(--success-bg); color: var(--success); }
-.badge-failed { background: var(--error-bg); color: var(--error); }
+.badge-pending { background: #e9ecef; color: #343a40; }
+.badge-processing { background: #dbe4ff; color: #1c3faa; }
+.badge-certified { background: var(--success-bg); color: #1b6e2f; }
+.badge-failed { background: var(--error-bg); color: #a61e1e; }
 
 .steps { display: flex; list-style: none; padding: 0; margin: 0.5rem 0; gap: 0.25rem; }
 .step { flex: 1; text-align: center; font-size: 0.85rem; padding: 0.35rem; border-top: 4px solid var(--border); color: var(--muted); }
