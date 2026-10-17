@@ -129,6 +129,8 @@ Each minted certificate contains:
 - `GET /api/verify/status/:jobId` — check verification status
 - `POST /api/webhook` — receive real-time callbacks
 
+See [docs/api](docs/api/README.md) for the implemented endpoints, [versioning](docs/api/versioning.md), and the [error format](docs/api/errors.md).
+
 ---
 
 ## 🛠️ Smart Contracts
