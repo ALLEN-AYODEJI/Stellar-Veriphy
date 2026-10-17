@@ -56,25 +56,25 @@ interface VariantStyle {
 const VARIANT_STYLES: Record<StatusBadgeVariant, VariantStyle> = {
   success: {
     bg: "bg-emerald-50 dark:bg-emerald-950",
-    text: "text-emerald-700 dark:text-emerald-200",
+    text: "text-emerald-800 dark:text-emerald-100",
     ring: "ring-emerald-600/20 dark:ring-emerald-300/30",
     Icon: CheckCircle2,
   },
   warning: {
     bg: "bg-amber-50 dark:bg-amber-950",
-    text: "text-amber-700 dark:text-amber-200",
+    text: "text-amber-900 dark:text-amber-100",
     ring: "ring-amber-600/20 dark:ring-amber-300/30",
     Icon: AlertTriangle,
   },
   error: {
     bg: "bg-red-50 dark:bg-red-950",
-    text: "text-red-700 dark:text-red-200",
+    text: "text-red-800 dark:text-red-100",
     ring: "ring-red-600/20 dark:ring-red-300/30",
     Icon: XCircle,
   },
   info: {
     bg: "bg-blue-50 dark:bg-blue-950",
-    text: "text-blue-700 dark:text-blue-200",
+    text: "text-blue-800 dark:text-blue-100",
     ring: "ring-blue-600/20 dark:ring-blue-300/30",
     Icon: Info,
   },
