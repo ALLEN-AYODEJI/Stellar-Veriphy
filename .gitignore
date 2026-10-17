@@ -5,3 +5,13 @@ dist/
 target/
 .next/
 *.wasm
+
+# Local API data store (frontend/lib/server/json-collection.ts)
+.data/
+*.tsbuildinfo
+*.tsbuildinfo
+coverage/
+test-results/
+reports/
+.bundle-reports/
+.stryker-tmp/
