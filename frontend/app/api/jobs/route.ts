@@ -71,7 +71,7 @@ export async function POST(req: Request) {
       uploadId,
       error: err,
     });
-    return serverError("POST /api/jobs", err);
+    return serverError("POST /api/jobs", err, requestId);
   }
 }
 
@@ -88,6 +88,6 @@ export async function GET(req: Request) {
   try {
     return respond<VerificationJobView[]>(200, { status: "ok", data: await getJobViews(ids) });
   } catch (err) {
-    return serverError("GET /api/jobs", err);
+    return serverError("GET /api/jobs", err, requestIdFrom(req));
   }
 }

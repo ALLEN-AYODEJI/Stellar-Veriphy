@@ -10,6 +10,8 @@
 | [Gas Costs and Fee Reference](gas-costs.md)       | Integrators, providers, requesters                    | Stellar/Soroban fee mechanics, per-operation cost tiers, application-level pricing, staking, TTL, optimization tips |
 | [Glossary](glossary.md)                           | Everyone                                              | Definitions for all domain terms, contract concepts, and Stellar/Soroban fundamentals used across the project      |
 | [Contract Error Codes](api/error-codes.md)        | Contributors, support, integrators                    | Contract-specific error enums, triggers, and first-pass remediation                                                |
+| [Request IDs](api/request-ids.md) | Support, contributors, integrators | `X-Request-Id` header, log correlation, troubleshooting a failed request |
+| [Rate Limits](api/rate-limits.md) | Frontend contributors, integrators | Per-route limits, `X-RateLimit-*` / `Retry-After` headers, 429 body format |
 | [Manifest Storage API](api/manifest-storage.md)   | Integrators, backend contributors                     | Creating, validating and retrieving manifests; request/response examples; error list; auth status                 |
 | [Upload Sessions API](api/upload-sessions.md)     | Integrators, frontend/backend contributors            | Resumable uploads: session lifecycle, progress tracking, resume and restart                                        |
 | [Pagination](api/pagination.md)                   | Contributors, integrators                             | Pagination parameters and metadata shared by collection endpoints                                                  |

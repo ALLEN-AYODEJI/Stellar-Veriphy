@@ -32,8 +32,13 @@ export async function POST(req: NextRequest) {
       if (now - lastRequest < 60000) {
         const waitSec = Math.ceil((60000 - (now - lastRequest)) / 1000);
         return NextResponse.json(
-          { error: `Please wait ${waitSec}s before requesting a new code.` },
-          { status: 429 }
+          {
+            code: "rate_limited",
+            error: `You can request one verification code per minute. Please wait ${waitSec} seconds before requesting a new code.`,
+            retryAfterSeconds: waitSec,
+            rateLimit: { limit: 1, windowSeconds: 60, retryAfterSeconds: waitSec },
+          },
+          { status: 429, headers: { "Retry-After": String(waitSec) } }
         );
       }
 
@@ -88,7 +93,11 @@ export async function POST(req: NextRequest) {
       if (record.attempts > 5) {
         challengeStore.delete(key);
         return NextResponse.json(
-          { error: "Too many failed attempts. This code is invalidated. Request a new one." },
+          {
+            code: "attempts_exhausted",
+            error: "Too many incorrect attempts (5 allowed per code). This code is no longer valid — request a new one.",
+            rateLimit: { limit: 5, remaining: 0 },
+          },
           { status: 429 }
         );
       }

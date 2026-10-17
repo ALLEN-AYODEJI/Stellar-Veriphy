@@ -16,6 +16,8 @@ import {
   type TrustScoreConfig,
   type TrustTier,
 } from "@stellarveriphy/shared";
+import { RetryableError } from "@/components/ui/RetryableError";
+import { fetchJson } from "@/lib/apiErrors";
 import { DashboardEmptyState } from "./DashboardEmptyState";
 
 const TIER_STYLES: Record<TrustTier, string> = {
@@ -121,36 +123,59 @@ function ProviderRow({ s }: { s: ProviderTrustScore }) {
 export function ProviderTrustDashboard() {
   const [data, setData] = useState<TrustResponse | null>(null);
   const [weights, setWeights] = useState<Record<TrustFactorKey, number> | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<unknown>(null);
+  const [loading, setLoading] = useState(true);
+  const [previewError, setPreviewError] = useState<{ error: unknown; weights: Record<TrustFactorKey, number> } | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const body = await fetchJson<{ success: boolean; data: TrustResponse; error?: string }>("/api/oracles/trust", {
+        cache: "no-store",
+      });
+      if (!body.success) throw new Error(body.error ?? "Failed to load trust scores.");
+      setData(body.data);
+      setWeights(body.data.config.weights);
+    } catch (err) {
+      setLoadError(err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    fetch("/api/oracles/trust", { cache: "no-store" })
-      .then((r) => r.json())
-      .then((body) => {
-        if (!body.success) throw new Error(body.error);
-        setData(body.data);
-        setWeights(body.data.config.weights);
-      })
-      .catch(() => setError("Failed to load trust scores."));
-  }, []);
+    void load();
+  }, [load]);
 
   const preview = useCallback(async (next: Record<TrustFactorKey, number>) => {
     setWeights(next);
+    setPreviewError(null);
     try {
-      const res = await fetch("/api/oracles/trust", {
+      const body = await fetchJson<{ success: boolean; data: TrustResponse; error?: string }>("/api/oracles/trust", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ config: { weights: next } }),
       });
-      const body = await res.json();
       if (body.success) setData(body.data);
-    } catch {
-      setError("Preview failed.");
+    } catch (err) {
+      // Keep the last good scores on screen; offer to re-run just the preview.
+      setPreviewError({ error: err, weights: next });
     }
   }, []);
 
-  if (error) return <p role="alert" className="text-sm text-red-600 dark:text-red-400">{error}</p>;
-  if (!data || !weights) return <p className="text-sm text-gray-500">Computing trust scores…</p>;
+  if (loadError && !data) {
+    return (
+      <RetryableError error={loadError} title="Couldn't load trust scores" onRetry={load} retrying={loading} />
+    );
+  }
+  if (!data || !weights) {
+    return (
+      <p className="text-sm text-gray-500" role="status" aria-busy="true">
+        Computing trust scores…
+      </p>
+    );
+  }
 
   const risky = data.scores.filter((s) => s.highRisk);
   const others = data.scores.filter((s) => !s.highRisk);
@@ -179,6 +204,14 @@ export function ProviderTrustDashboard() {
 
   return (
     <div className="space-y-6">
+      {previewError && (
+        <RetryableError
+          variant="inline"
+          error={previewError.error}
+          title="Preview failed"
+          onRetry={() => preview(previewError.weights)}
+        />
+      )}
       <p className="text-xs text-gray-500">
         Source: {data.source === "sample" ? "sample data (oracle contract not configured)" : data.source} · computed{" "}
         {new Date(data.computedAt).toLocaleString()} · model v{data.scores[0]?.modelVersion}

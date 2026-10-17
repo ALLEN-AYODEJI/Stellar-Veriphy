@@ -11,6 +11,7 @@ import {
   type AssetStatusFilter,
 } from "@/components/AssetStatusFilterChips";
 import { CollapsibleMetadataPanel } from "@/components/ui/CollapsibleMetadataPanel";
+import { CardGrid } from "@/components/ui/CardGrid";
 import { SearchFilters, type SearchFiltersState } from "@/components/ui/SearchFilters";
 
 interface ExploreClientProps {
@@ -144,11 +145,11 @@ export function ExploreClient({ initialRecords }: ExploreClientProps) {
           </button>
         </div>
       ) : (
-        <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <CardGrid as="ul" layout="listing">
           {filteredRecords.map((record) => (
             <li
               key={record.id}
-              className="relative flex flex-col rounded-xl border border-slate-200 bg-white shadow-sm focus-within:ring-2 focus-within:ring-indigo-600 dark:border-gray-800 dark:bg-gray-900 overflow-hidden"
+              className="relative flex h-full flex-col rounded-xl border border-slate-200 bg-white shadow-sm focus-within:ring-2 focus-within:ring-indigo-600 dark:border-gray-800 dark:bg-gray-900 overflow-hidden"
             >
               <div className="flex items-center justify-between gap-2 px-5 pt-5 text-xs uppercase tracking-wide text-slate-500">
                 <span>{record.mediaType}</span>
@@ -193,7 +194,7 @@ export function ExploreClient({ initialRecords }: ExploreClientProps) {
                 )}
             </li>
           ))}
-        </ul>
+        </CardGrid>
       )}
     </div>
   );

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { auditLogger } from "@/lib/security/auditLogger";
 import { validateVerificationRequest } from "@/lib/security/inputValidation";
-import { buildRateLimitHeaders, evaluateRateLimit } from "@/lib/security/rateLimiter";
+import { buildRateLimitErrorBody, buildRateLimitHeaders, evaluateRateLimit } from "@/lib/security/rateLimiter";
 import { logOperationalEvent, requestIdFrom } from "@/lib/server/observability";
 
 function resolveAddressForRateLimit(bodyAddress: string | undefined, request: NextRequest): string {
@@ -50,11 +50,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         },
       });
       return NextResponse.json(
-        {
-          success: false,
-          error: "Rate limit exceeded. Please retry after the backoff period.",
-          retryAfterSeconds: fallbackLimit.retryAfterSeconds,
-        },
+        buildRateLimitErrorBody(fallbackLimit, { action: "verification requests", requestId }),
         { status: 429, headers: fallbackHeaders }
       );
     }
@@ -107,11 +103,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       },
     });
     return NextResponse.json(
-      {
-        success: false,
-        error: "Rate limit exceeded. Please retry after the backoff period.",
-        retryAfterSeconds: limit.retryAfterSeconds,
-      },
+      buildRateLimitErrorBody(limit, { action: "verification requests", requestId }),
       { status: 429, headers: rateLimitHeaders }
     );
   }

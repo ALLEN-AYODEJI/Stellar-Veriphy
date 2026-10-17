@@ -115,7 +115,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     return respond(201, { status: "created", data: record });
   } catch (err) {
-    return serverError("POST /api/uploads/[id]/ai-label", err);
+    return serverError("POST /api/uploads/[id]/ai-label", err, requestId);
   }
 }
 
@@ -136,6 +136,6 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     }
     return respond(200, { status: "ok", data: record });
   } catch (err) {
-    return serverError("GET /api/uploads/[id]/ai-label", err);
+    return serverError("GET /api/uploads/[id]/ai-label", err, requestIdFrom(_req));
   }
 }

@@ -16,6 +16,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { CopyButton } from "@/components/CopyButton";
+import { CardGrid } from "@/components/ui/CardGrid";
+import { RetryableError } from "@/components/ui/RetryableError";
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 import {
   type CertificateDetails,
@@ -58,6 +60,7 @@ export function CertificateGallery({ className = "" }: CertificateGalleryProps) 
   const [offset, setOffset] = useState(0);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<{ error: unknown; offset: number } | null>(null);
   const [creatorFilter, setCreatorFilter] = useState("");
   const [sortOrder, setSortOrder] = useState<SortOrder>("newest");
   const [selected, setSelected] = useState<CertificateDetails | null>(null);
@@ -65,6 +68,7 @@ export function CertificateGallery({ className = "" }: CertificateGalleryProps) 
   const loadPage = useCallback(
     async (nextOffset: number) => {
       setLoading(true);
+      setLoadError(null);
       try {
         const res = await searchCertificates({
           creator: creatorFilter || undefined,
@@ -77,7 +81,11 @@ export function CertificateGallery({ className = "" }: CertificateGalleryProps) 
           );
           setTotal(res.data.total);
           setOffset(nextOffset + res.data.certificates.length);
+        } else {
+          setLoadError({ error: new Error(res.error ?? "Could not load certificates."), offset: nextOffset });
         }
+      } catch (err) {
+        setLoadError({ error: err, offset: nextOffset });
       } finally {
         setLoading(false);
       }
@@ -91,11 +99,11 @@ export function CertificateGallery({ className = "" }: CertificateGalleryProps) 
   }, [loadPage]);
 
   const { sentinelRef, isIntersecting, reset } = useInfiniteScroll({
-    enabled: !loading && items.length < total,
+    enabled: !loading && !loadError && items.length < total,
   });
 
   useEffect(() => {
-    if (isIntersecting && !loading && items.length < total) {
+    if (isIntersecting && !loading && !loadError && items.length < total) {
       loadPage(offset).then(reset);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -135,14 +143,14 @@ export function CertificateGallery({ className = "" }: CertificateGalleryProps) 
 
       {/* Grid */}
       {items.length > 0 && (
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+        <CardGrid layout="gallery">
           {sorted.map((cert) => {
             const hue = hueFromId(cert.id);
             return (
               <button
                 key={cert.id}
                 onClick={() => setSelected(cert)}
-                className="group overflow-hidden rounded-lg border border-gray-200 text-left transition hover:shadow-md dark:border-gray-800"
+                className="group flex h-full flex-col overflow-hidden rounded-xl border border-gray-200 bg-white text-left transition hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-gray-800 dark:bg-gray-900"
                 aria-label={`View certificate ${cert.id}`}
               >
                 <div
@@ -153,7 +161,7 @@ export function CertificateGallery({ className = "" }: CertificateGalleryProps) 
                 >
                   #{cert.id}
                 </div>
-                <div className="p-2">
+                <div className="p-3">
                   <p className="truncate text-xs font-medium text-gray-800 dark:text-gray-200">
                     {cert.creator.slice(0, 8)}…{cert.creator.slice(-4)}
                   </p>
@@ -164,10 +172,20 @@ export function CertificateGallery({ className = "" }: CertificateGalleryProps) 
               </button>
             );
           })}
-        </div>
+        </CardGrid>
       )}
 
-      {items.length === 0 && !loading && (
+      {/* First page failed: replace the grid with a retryable error, not a misleading empty state */}
+      {items.length === 0 && loadError && (
+        <RetryableError
+          error={loadError.error}
+          title="Couldn't load certificates"
+          onRetry={() => loadPage(loadError.offset)}
+          retrying={loading}
+        />
+      )}
+
+      {items.length === 0 && !loading && !loadError && (
         <div className="py-16 text-center">
           <div className="mx-auto w-16 h-16 mb-4 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
             <svg
@@ -212,7 +230,7 @@ export function CertificateGallery({ className = "" }: CertificateGalleryProps) 
         </div>
       )}
 
-      {items.length === 0 && !loading && !creatorFilter && (
+      {items.length === 0 && !loading && !loadError && !creatorFilter && (
         <EmptyState
           illustration="certificates"
           heading="No verified assets yet"
@@ -232,7 +250,16 @@ export function CertificateGallery({ className = "" }: CertificateGalleryProps) 
       <div ref={sentinelRef} className="h-8" />
       {/* Subsequent pages (items already showing): a lightweight inline indicator rather than re-showing the full skeleton grid. */}
       {items.length > 0 && loading && (
-        <p className="py-4 text-center text-sm text-gray-500 dark:text-gray-400">Loading…</p>
+        <p className="py-4 text-center text-sm text-gray-500 dark:text-gray-400" role="status">Loading more…</p>
+      )}
+      {/* A later page failed: keep what's loaded and offer to retry just that page */}
+      {items.length > 0 && loadError && !loading && (
+        <RetryableError
+          variant="inline"
+          error={loadError.error}
+          title="Couldn't load more certificates"
+          onRetry={() => loadPage(loadError.offset)}
+        />
       )}
 
       {/* Lightbox */}

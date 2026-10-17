@@ -1,6 +1,7 @@
 "use client";
 
 import { DashboardWidgetSkeleton } from "@/components/ui/Skeleton";
+import { CardGrid } from "@/components/ui/CardGrid";
 import type { DashboardMetrics } from "@/lib/provenance/data";
 import Link from "next/link";
 import { DashboardEmptyState } from "./DashboardEmptyState";
@@ -30,13 +31,13 @@ function formatDuration(seconds: number): string {
 export function MetricsCards({ metrics }: MetricsCardsProps) {
   if (!metrics) {
     return (
-      <div className="space-y-4">
+      <div className="space-y-4 lg:space-y-6">
         {/* Stat cards — 4 columns match the loaded layout */}
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <CardGrid layout="stats">
           {Array.from({ length: 4 }).map((_, i) => (
             <DashboardWidgetSkeleton key={i} />
           ))}
-        </div>
+        </CardGrid>
         {/* Sparkline / chart row — fixed height matches the loaded widget */}
         <div
           className="h-[88px] animate-pulse rounded-xl bg-gray-200 dark:bg-gray-800"
@@ -100,12 +101,12 @@ export function MetricsCards({ metrics }: MetricsCardsProps) {
   ];
 
   return (
-    <div className="space-y-4">
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="space-y-4 lg:space-y-6">
+      <CardGrid layout="stats">
         {cards.map((c) => (
           <div
             key={c.label}
-            className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800"
+            className="flex h-full flex-col rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800"
           >
             <p className="text-sm font-medium text-gray-600 dark:text-gray-300">{c.label}</p>
             <p className="mt-2 flex items-baseline gap-1.5">
@@ -114,13 +115,13 @@ export function MetricsCards({ metrics }: MetricsCardsProps) {
             </p>
             <p className={`mt-1 text-xs ${c.hintClass ?? "text-gray-500 dark:text-gray-400"}`}>{c.hint}</p>
             {c.actionHref && c.actionLabel && (
-              <Link href={c.actionHref} className="mt-3 inline-flex min-h-11 items-center text-xs font-medium text-blue-700 underline-offset-2 hover:underline focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-blue-400">
+              <Link href={c.actionHref} className="mt-auto inline-flex self-start pt-3 min-h-11 items-center text-xs font-medium text-blue-700 underline-offset-2 hover:underline focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-blue-400">
                 {c.actionLabel} →
               </Link>
             )}
           </div>
         ))}
-      </div>
+      </CardGrid>
       <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
         <div className="flex items-baseline justify-between">
           <p className="text-sm font-medium text-gray-600 dark:text-gray-300">Completed verifications · last 14 days</p>

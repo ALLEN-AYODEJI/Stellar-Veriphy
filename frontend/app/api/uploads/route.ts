@@ -61,7 +61,7 @@ export async function POST(req: Request) {
       contentHash: result.value.contentHash,
       error: err,
     });
-    return serverError("POST /api/uploads", err);
+    return serverError("POST /api/uploads", err, requestId);
   }
 }
 
@@ -83,6 +83,6 @@ export async function GET(req: Request) {
     const page = paginate(await findUploadsByHash(contentHash), pageParams.value);
     return respond<UploadRecord[]>(200, { status: "ok", data: page.items, pagination: page.pagination });
   } catch (err) {
-    return serverError("GET /api/uploads", err);
+    return serverError("GET /api/uploads", err, requestIdFrom(req));
   }
 }

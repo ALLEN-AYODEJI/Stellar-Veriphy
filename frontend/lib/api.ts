@@ -1,3 +1,4 @@
+import type { UploadMetadata, UploadRecord, VerificationJobView } from "@stellarveriphy/shared";
 import type {
   FieldError,
   UploadMetadata,
@@ -8,17 +9,9 @@ import type {
   VerificationJobView,
 } from "@stellarveriphy/shared";
 import { resolveApiEndpoint } from "@/config";
+import { ApiError, apiErrorFromResponse, createRequestId, networkError } from "@/lib/apiErrors";
 
-export class ApiError extends Error {
-  constructor(
-    message: string,
-    readonly httpStatus: number,
-    readonly errors: FieldError[] = [],
-    readonly retryAfterSeconds?: number
-  ) {
-    super(message);
-  }
-}
+export { ApiError };
 
 export interface RetryUpdate {
   attempt: number;
@@ -60,9 +53,14 @@ async function request<T>(pathOrUrl: string, init?: RequestOptions): Promise<T> 
   let lastError: ApiError | null = null;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    // Sent so client logs and server logs share the same ID (see docs/api/request-ids.md).
+    const requestId = createRequestId();
+    const headers = new Headers(fetchInit.headers);
+    headers.set("X-Request-Id", requestId);
+
     let res: Response | null = null;
     try {
-      res = await fetch(url, fetchInit);
+      res = await fetch(url, { ...fetchInit, headers });
     } catch {
       res = null;
     }
@@ -71,6 +69,7 @@ async function request<T>(pathOrUrl: string, init?: RequestOptions): Promise<T> 
     const body = res ? await res.json().catch(() => null) : null;
     if (res?.ok) return body.data as T;
 
+    lastError = res ? apiErrorFromResponse(res, body) : networkError(requestId);
     const retryAfter = Number(res?.headers.get("Retry-After") ?? body?.retryAfterSeconds);
     const retryAfterSeconds = Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : undefined;
     const rateLimitMessage =
@@ -89,30 +88,34 @@ async function request<T>(pathOrUrl: string, init?: RequestOptions): Promise<T> 
 
     if (attempt >= maxAttempts || !shouldRetry(status)) {
       if (attempt > 1) {
-        console.error("Upload request failed after retry attempts", {
+        console.error("API request failed after retry attempts", {
           url,
           attempts: attempt,
           status,
+          requestId: lastError.requestId,
           message: lastError.message,
         });
       }
       throw lastError;
     }
 
-    const delayMs = retryDelay(attempt, baseDelayMs, maxDelayMs);
+    // Honour the server's Retry-After instead of hammering a rate-limited endpoint.
+    const backoffMs = retryDelay(attempt, baseDelayMs, maxDelayMs);
+    const delayMs = lastError.retryAfterSeconds ? Math.max(backoffMs, lastError.retryAfterSeconds * 1000) : backoffMs;
     retry?.onRetry?.({
       attempt,
       maxAttempts,
       delayMs,
-      reason: status === 0 ? "network unavailable" : `HTTP ${status}`,
+      reason: status === 0 ? "network unavailable" : status === 429 ? "rate limited" : `HTTP ${status}`,
     });
-    console.warn("Transient upload request failure; retrying", {
+    console.warn("Transient API request failure; retrying", {
       url,
       attempt,
       nextAttempt: attempt + 1,
       maxAttempts,
       delayMs,
       status,
+      requestId: lastError.requestId,
     });
     await wait(delayMs);
   }

@@ -17,6 +17,7 @@ export type ApiStatus =
   | "unsupported_media_type"
   | "validation_error"
   | "not_found"
+  | "rate_limited"
   | "conflict"
   | "expired"
   | "server_error";
@@ -26,6 +27,7 @@ export interface ApiBody<T> {
   message?: string;
   errors?: FieldError[];
   data?: T;
+  requestId?: string;
   pagination?: PaginationMeta;
 }
 
@@ -48,6 +50,7 @@ export async function readJson(req: Request): Promise<{ body: unknown } | { resp
   }
 }
 
+export function serverError(context: string, err: unknown, requestId?: string) {
 // The one response shape for invalid input, used by every route (422 + field errors).
 export function validationError(errors: FieldError[], message = "The request is invalid. See `errors` for details.") {
   return respond(422, { status: "validation_error", message, errors });
@@ -77,12 +80,19 @@ export function readPagination(
 
 export function serverError(context: string, err: unknown) {
   logOperationalEvent("error", "api.server_error", {
+    requestId,
     route: context,
     operation: "request",
     status: 500,
     error: err,
   });
-  return respond(500, { status: "server_error", message: "Something went wrong on our side. Please try again." });
+  return respond(500, {
+    status: "server_error",
+    message: requestId
+      ? `Something went wrong on our side. Please try again. If it keeps happening, contact support with reference ${requestId}.`
+      : "Something went wrong on our side. Please try again.",
+    requestId,
+  });
 }
 
 // Validation error in the legacy `{ success, error }` envelope used by older

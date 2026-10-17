@@ -26,6 +26,7 @@ import {
 
 import { Header } from "@/components/Header";
 import { Breadcrumbs } from "@/components/ui/Breadcrumbs";
+import { cardGridClassName } from "@/components/ui/CardGrid";
 
 // ---------------------------------------------------------------------------
 // Types (public-safe — no internal keys or credentials)
@@ -183,7 +184,7 @@ function StatCard({
   }[color];
 
   return (
-    <div className="rounded border border-[#cad3ce] bg-white px-5 py-4">
+    <div className="h-full rounded border border-[#cad3ce] bg-white px-5 py-4">
       <p className="text-xs font-semibold uppercase tracking-wide text-[#617168]">{label}</p>
       <p className={`mt-1 text-2xl font-bold tabular-nums ${valueColor}`}>{value}</p>
       {sub && <p className="mt-0.5 text-xs text-[#617168]">{sub}</p>}
@@ -310,7 +311,7 @@ export default function RegistryTrustPage() {
               <h2 id="stats-heading" className="mb-4 text-lg font-semibold">
                 Verification statistics
               </h2>
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <div className={cardGridClassName("stats-3")}>
                 <StatCard
                   label="Total certificates minted"
                   value={data.stats.totalCertificates.toLocaleString()}

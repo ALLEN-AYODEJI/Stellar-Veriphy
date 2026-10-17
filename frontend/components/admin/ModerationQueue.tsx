@@ -9,6 +9,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
+import { cardGridClassName } from "@/components/ui/CardGrid";
 import type {
   ModerationQueueItem,
   ModerationQueueSummary,
@@ -58,7 +59,7 @@ function SummaryCard({
   accent?: string;
 }) {
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+    <div className="h-full bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
       <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
         {label}
       </p>
@@ -337,7 +338,7 @@ export function ModerationQueue({ defaultStatusFilter }: Props) {
   return (
     <div className="space-y-6">
       {/* Summary cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div className={cardGridClassName("summary")}>
         <SummaryCard label="Total" value={summary.total} />
         <SummaryCard
           label="Pending"

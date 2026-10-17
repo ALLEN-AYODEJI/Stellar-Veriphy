@@ -2,6 +2,7 @@
 
 import React from "react";
 
+import { RetryableError } from "@/components/ui/RetryableError";
 import { captureException } from "@/lib/error-tracking/client";
 
 interface ErrorBoundaryProps {
@@ -36,27 +37,20 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
     }
   }
 
+  private reset = () => {
+    this.setState({ hasError: false, error: undefined });
+  };
+
   render() {
     if (this.state.hasError) {
       return (
         this.props.fallback || (
-          <div
-            style={{
-              padding: "20px",
-              backgroundColor: "#f8d7da",
-              border: "1px solid #f5c6cb",
-              borderRadius: "4px",
-              color: "#721c24",
-            }}
-          >
-            <h2>Something went wrong</h2>
-            <p>We&apos;ve logged this error and will look into it.</p>
-            {this.state.error && (
-              <details style={{ whiteSpace: "pre-wrap", marginTop: "10px" }}>
-                {this.state.error.toString()}
-              </details>
-            )}
-          </div>
+          <RetryableError
+            error={this.state.error}
+            title="Something went wrong"
+            fallbackMessage="We've logged this error and will look into it."
+            onRetry={this.reset}
+          />
         )
       );
     }
