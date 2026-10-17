@@ -16,13 +16,12 @@ export function Field({ id, label, help, error, children }: FieldProps) {
       <label htmlFor={id}>{label}</label>
       {children}
       <div id={`${id}-desc`}>
-        {error ? (
+        {help && <p className="muted">{help}</p>}
+        {error && (
           <p className="error-text">
             {error.message}
             {error.hint && <span className="hint"> {error.hint}</span>}
           </p>
-        ) : (
-          help && <p className="muted">{help}</p>
         )}
       </div>
     </div>

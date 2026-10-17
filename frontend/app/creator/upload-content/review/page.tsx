@@ -2,10 +2,11 @@
 
 import type { UploadMetadata } from "@stellarveriphy/shared";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { useWizard } from "@/context/WizardContext";
 import { ApiError, api, type RetryUpdate } from "@/lib/api";
+import { ShortcutHint } from "@/components/ui/ShortcutHint";
 
 function downloadManifest(manifest: unknown, filename: string) {
   const blob = new Blob([JSON.stringify(manifest, null, 2)], {
@@ -127,6 +128,17 @@ export default function ReviewPage() {
 
   const isSubmitting = submitState === "uploading" || submitState === "retrying";
 
+  useEffect(() => {
+    const handleShortcut = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key === "Enter" && !isSubmitting && submitState === "idle") {
+        event.preventDefault();
+        void handleSubmit();
+      }
+    };
+    document.addEventListener("keydown", handleShortcut);
+    return () => document.removeEventListener("keydown", handleShortcut);
+  }, [isSubmitting, submitState, handleSubmit]);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -239,9 +251,10 @@ export default function ReviewPage() {
       >
         {submitState === "retrying"
           ? "Retrying upload..."
-          : submitState === "queued"
-            ? "Submitted"
-            : "Submit for Verification"}
+            : submitState === "queued"
+              ? "Submitted"
+              : "Submit for Verification"}
+        {submitState === "idle" && <ShortcutHint keys="Ctrl + Enter" />}
       </button>
     </div>
   );

@@ -8,6 +8,7 @@ StellarVeriphy is a monorepo with two toolchains: **Node.js/pnpm** for the front
 
 ## Table of contents
 
+- [Creator onboarding checklist](#creator-onboarding-checklist)
 - [Environment setup](#environment-setup)
 - [Dependency installation](#dependency-installation)
 - [Local development workflow](#local-development-workflow)
@@ -15,6 +16,17 @@ StellarVeriphy is a monorepo with two toolchains: **Node.js/pnpm** for the front
 - [Code style guidelines](#code-style-guidelines)
 - [Contribution process](#contribution-process)
 - [Common issues and solutions](#common-issues-and-solutions)
+
+## Creator onboarding checklist
+
+Use this short checklist when helping a creator get started:
+
+1. **Connect a Stellar wallet** — the wallet signs verification records.
+2. **Upload an asset** — choose a photo, video, audio file, or document.
+3. **Add creator details** — review the public key and optional provenance metadata.
+4. **Verify and track it** — submit the asset and follow its status from the jobs list.
+
+Each step leads directly to the next action, so creators can complete setup without reading the full developer guide.
 
 ## Environment setup
 
@@ -163,4 +175,3 @@ StellarVeriphy incorporates a challenge-response verification flow (`frontend/co
 - **Duplicate Submission Prevention**: Form submit controls and resend triggers are disabled while requests are inflight and during cooldown periods.
 - **Clear State Transitions**: Distinct UI feedback for challenge request, code input, verification in progress, success confirmation, and specific error states.
 - **Direct Focus Management**: Focus automatically shifts to the code input field upon entering the challenge phase.
-

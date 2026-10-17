@@ -302,7 +302,11 @@ export const CertificateCard = React.memo(function CertificateCard({
         </div>
 
         {/* Details */}
-        <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+        <dl className="grid grid-cols-1 gap-x-4 gap-y-2 text-sm sm:grid-cols-2">
+          <div>
+            <dt className="text-xs text-gray-400 dark:text-gray-500">Verification</dt>
+            <dd className="text-gray-700 dark:text-gray-300 text-xs mt-0.5">{statusCfg.label} record</dd>
+          </div>
           <div>
             <dt className="text-xs text-gray-400 dark:text-gray-500">Creator</dt>
             <dd
@@ -318,8 +322,14 @@ export const CertificateCard = React.memo(function CertificateCard({
               {formatDate(timestamp)}
             </dd>
           </div>
+          <div className="sm:col-span-2">
+            <dt className="text-xs text-gray-400 dark:text-gray-500">Provenance</dt>
+            <dd className="text-gray-700 dark:text-gray-300 text-xs mt-0.5">
+              {storageRef ? "Anchored with a storage reference" : "On-chain record pending storage reference"}
+            </dd>
+          </div>
           {storageRef && (
-            <div className="col-span-2">
+            <div className="col-span-1 sm:col-span-2">
               <dt className="text-xs text-gray-400 dark:text-gray-500">Storage Ref</dt>
               <dd className="font-mono text-gray-700 dark:text-gray-300 truncate text-xs mt-0.5">
                 {truncate(storageRef, 36)}

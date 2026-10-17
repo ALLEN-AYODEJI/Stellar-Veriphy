@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircle2, KeyRound, ShieldCheck, Sparkles, UploadCloud } from "lucide-react";
+import { CheckCircle2, KeyRound, ShieldCheck, UploadCloud } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
@@ -11,38 +11,33 @@ interface OnboardingScreen {
   icon: React.ComponentType<{ className?: string | undefined }>;
   title: string;
   description: string;
+  next: string;
 }
 
 const SCREENS: OnboardingScreen[] = [
   {
-    icon: Sparkles,
-    title: "Welcome to StellarVeriphy",
-    description:
-      "The easiest way to prove your photos, videos, and documents are genuinely yours — and keep that proof safe for good.",
-  },
-  {
     icon: ShieldCheck,
-    title: "Give your content a stamp of authenticity",
-    description:
-      "We check that your file hasn't been altered and record a permanent, tamper-proof certificate for it — no technical knowledge needed.",
+    title: "Creator setup checklist",
+    description: "Complete these steps to create your first verifiable asset.",
+    next: "Start with a Stellar wallet",
   },
   {
     icon: KeyRound,
-    title: "Connect a wallet to get started",
-    description:
-      "You'll need a free Stellar wallet — Freighter is a good place to start — to sign your verifications. Setup only takes a minute, and we'll walk you through it.",
+    title: "Connect your wallet",
+    description: "Use a Stellar wallet to sign verification records.",
+    next: "Then upload a photo, video, or document",
   },
   {
     icon: UploadCloud,
-    title: "Upload, and we'll handle the rest",
-    description:
-      "Drop in a file and we generate its certificate automatically. No blockchain experience required — just upload and confirm.",
+    title: "Upload your asset",
+    description: "Choose a file and add the creator details you want recorded.",
+    next: "Review the details before submitting",
   },
   {
     icon: CheckCircle2,
-    title: "You're ready to go",
-    description:
-      "Head to Upload to verify your first piece of content. You can replay this tour anytime from Help.",
+    title: "Verify and track it",
+    description: "Submit the asset, then follow its verification status from your jobs list.",
+    next: "Finish setup and upload your first asset",
   },
 ];
 
@@ -141,6 +136,10 @@ export function OnboardingFlow() {
             {screen.title}
           </h2>
           <p className="text-sm text-gray-600 dark:text-gray-400 max-w-sm">{screen.description}</p>
+          <div className="mt-5 w-full max-w-sm rounded-lg bg-gray-50 p-3 text-left dark:bg-gray-800/70">
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Next</p>
+            <p className="mt-1 text-sm text-gray-700 dark:text-gray-200">{screen.next}</p>
+          </div>
         </div>
 
         {/* Progress dots */}
