@@ -11,6 +11,7 @@ export type ApiStatus =
   | "unsupported_media_type"
   | "validation_error"
   | "not_found"
+  | "rate_limited"
   | "server_error";
 
 export interface ApiBody<T> {
@@ -18,6 +19,7 @@ export interface ApiBody<T> {
   message?: string;
   errors?: FieldError[];
   data?: T;
+  requestId?: string;
 }
 
 export function respond<T>(httpStatus: number, body: ApiBody<T>) {
@@ -39,12 +41,19 @@ export async function readJson(req: Request): Promise<{ body: unknown } | { resp
   }
 }
 
-export function serverError(context: string, err: unknown) {
+export function serverError(context: string, err: unknown, requestId?: string) {
   logOperationalEvent("error", "api.server_error", {
+    requestId,
     route: context,
     operation: "request",
     status: 500,
     error: err,
   });
-  return respond(500, { status: "server_error", message: "Something went wrong on our side. Please try again." });
+  return respond(500, {
+    status: "server_error",
+    message: requestId
+      ? `Something went wrong on our side. Please try again. If it keeps happening, contact support with reference ${requestId}.`
+      : "Something went wrong on our side. Please try again.",
+    requestId,
+  });
 }

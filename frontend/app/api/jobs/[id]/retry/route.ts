@@ -54,7 +54,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         errors: [{ field: "id", message: err.message, hint: "Add ?force=true to override the attempt limit." }],
       });
     }
-    return serverError("POST /api/jobs/[id]/retry", err);
+    return serverError("POST /api/jobs/[id]/retry", err, requestId);
   }
 }
 
@@ -73,6 +73,6 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     const state = await getRecoveryState(id, job.uploadId);
     return respond(200, { status: "ok", data: state });
   } catch (err) {
-    return serverError("GET /api/jobs/[id]/retry", err);
+    return serverError("GET /api/jobs/[id]/retry", err, requestIdFrom(_req));
   }
 }

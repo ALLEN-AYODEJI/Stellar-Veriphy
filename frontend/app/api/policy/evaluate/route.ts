@@ -105,6 +105,6 @@ export async function POST(req: Request) {
 
     return respond(200, { status: "ok", data: decision });
   } catch (err) {
-    return serverError("POST /api/policy/evaluate", err);
+    return serverError("POST /api/policy/evaluate", err, requestId);
   }
 }

@@ -8,6 +8,7 @@
  */
 
 import { cn } from "@/lib/utils";
+import { cardGridClassName } from "./CardGrid";
 
 // ---------------------------------------------------------------------------
 // Base Skeleton Component
@@ -150,7 +151,7 @@ export function TransactionListSkeleton({ count = 5 }: { count?: number }) {
 export function DashboardWidgetSkeleton() {
   return (
     <div
-      className="bg-white dark:bg-gray-900 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-800"
+      className="h-full bg-white dark:bg-gray-900 rounded-xl p-5 shadow-sm border border-gray-200 dark:border-gray-800"
       role="status"
       aria-label="Loading widget"
     >
@@ -264,17 +265,17 @@ export function CardGridSkeleton({ count = 6 }: { count?: number }) {
 export function GalleryGridSkeleton({ count = 9 }: { count?: number }) {
   return (
     <div
-      className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4"
+      className={cardGridClassName("gallery")}
       role="status"
       aria-label="Loading gallery"
     >
       {Array.from({ length: count }).map((_, i) => (
         <div
           key={i}
-          className="overflow-hidden rounded-lg border border-gray-200 dark:border-gray-800"
+          className="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-800"
         >
           <Skeleton className="aspect-square w-full" rounded="none" />
-          <div className="space-y-1.5 p-2">
+          <div className="space-y-1.5 p-3">
             <Skeleton className="h-3 w-2/3" />
             <Skeleton className="h-3 w-1/3" />
           </div>
@@ -291,7 +292,7 @@ export function GalleryGridSkeleton({ count = 9 }: { count?: number }) {
 export function StatsCardsSkeleton({ count = 3 }: { count?: number }) {
   return (
     <div
-      className="grid grid-cols-1 md:grid-cols-3 gap-4"
+      className={cardGridClassName("stats-3")}
       role="status"
       aria-label="Loading statistics"
     >

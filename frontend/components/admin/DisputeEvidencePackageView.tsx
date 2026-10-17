@@ -11,6 +11,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
+import { cardGridClassName } from "@/components/ui/CardGrid";
 import {
   EVIDENCE_KINDS,
   verifyEvidencePackage,
@@ -338,14 +339,14 @@ export function DisputeEvidencePackageView({ disputeId }: { disputeId: string })
         )}
       </section>
 
-      <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <section className={cardGridClassName("summary")}>
         {[
           ["Items", summary.totalItems],
           ["Hash matches", summary.matchingHashes],
           ["Hash mismatches", summary.mismatchingHashes],
           ["Invalid manifests", summary.invalidManifests],
         ].map(([label, value]) => (
-          <div key={label} className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-3">
+          <div key={label} className="h-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-3">
             <p className="text-xs uppercase tracking-wide text-gray-500">{label}</p>
             <p className="text-xl font-bold tabular-nums text-gray-900 dark:text-gray-100">{value}</p>
           </div>

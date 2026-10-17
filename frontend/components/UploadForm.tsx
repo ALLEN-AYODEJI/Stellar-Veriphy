@@ -17,6 +17,7 @@ import { trackJob } from "@/lib/tracked-jobs";
 import { Field } from "./Field";
 import { JobProgress } from "./JobProgress";
 import { MediaSnapshotPreview } from "./MediaSnapshotPreview";
+import { RetryableError } from "./ui/RetryableError";
 import { ShortcutHint } from "./ui/ShortcutHint";
 
 // Maps validation paths from the shared schema to the form input that fixes them.
@@ -148,6 +149,7 @@ export function UploadForm() {
   const [touched, setTouched] = useState<Set<string>>(new Set());
   const [submitAttempted, setSubmitAttempted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
   const [serverError, setServerError] = useState<ApiError | null>(null);
   const [submitted, setSubmitted] = useState<VerificationJobView | null>(null);
   const hashState = useFileHash(file);
@@ -334,6 +336,7 @@ export function UploadForm() {
 
   return (
     <form
+      ref={formRef}
       onSubmit={onSubmit}
       onKeyDown={(e) => {
         if ((e.ctrlKey || e.metaKey) && e.key === "Enter" && !submitting && hashState.status !== "hashing") {
@@ -344,7 +347,19 @@ export function UploadForm() {
       noValidate
       className="form"
     >
-      {(summaryErrors.length > 0 || serverError) && (
+      {/* Transient failure (network, 5xx, rate limit): one-click resubmit; the draft is kept */}
+      {serverError && serverError.isRetryable && serverError.errors.length === 0 && summaryErrors.length === 0 && (
+        <RetryableError
+          variant="inline"
+          error={serverError}
+          title="Submission didn't go through"
+          retryLabel="Resubmit"
+          retrying={submitting}
+          onRetry={() => formRef.current?.requestSubmit()}
+        />
+      )}
+
+      {(summaryErrors.length > 0 || (serverError && !(serverError.isRetryable && serverError.errors.length === 0))) && (
         <div className="notice notice-error" role="alert">
           <p><strong>{serverError && serverError.errors.length === 0 ? serverError.message : "Please fix the following before submitting:"}</strong></p>
           {serverError?.httpStatus === 429 && (

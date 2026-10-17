@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 
 import { useWizard } from "@/context/WizardContext";
 import { ApiError, api, type RetryUpdate } from "@/lib/api";
+import { RetryableError } from "@/components/ui/RetryableError";
 import { ShortcutHint } from "@/components/ui/ShortcutHint";
 
 function downloadManifest(manifest: unknown, filename: string) {
@@ -35,6 +36,7 @@ export default function ReviewPage() {
   const [submitState, setSubmitState] = useState<SubmitState>("idle");
   const [statusMessage, setStatusMessage] = useState("");
   const [failureDetails, setFailureDetails] = useState("");
+  const [submitError, setSubmitError] = useState<ApiError | null>(null);
   const {
     mode,
     file,
@@ -82,6 +84,7 @@ export default function ReviewPage() {
     setSubmitState("uploading");
     setStatusMessage("Registering upload metadata.");
     setFailureDetails("");
+    setSubmitError(null);
 
     try {
       const uploadMetadata: UploadMetadata = {
@@ -117,6 +120,7 @@ export default function ReviewPage() {
       const message = error instanceof ApiError ? error.message : "Upload submission failed.";
       setSubmitState("failed");
       setFailureDetails(message);
+      setSubmitError(error instanceof ApiError && error.isRetryable ? error : null);
       setStatusMessage("");
       console.error("Upload submission failed", {
         mode,
@@ -237,7 +241,16 @@ export default function ReviewPage() {
         </div>
       )}
 
-      {failureDetails && (
+      {submitError ? (
+        <RetryableError
+          variant="inline"
+          error={submitError}
+          title="Submission failed after automatic retries"
+          retryLabel="Retry submission"
+          retrying={isSubmitting}
+          onRetry={handleSubmit}
+        />
+      ) : failureDetails && (
         <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800" role="alert">
           {failureDetails}
         </div>

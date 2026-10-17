@@ -14,6 +14,7 @@ import type {
   OracleAnomaly,
   OracleThroughputPoint,
 } from "@stellarveriphy/shared";
+import { CardGrid } from "@/components/ui/CardGrid";
 import { DashboardEmptyState } from "./DashboardEmptyState";
 
 // ---------------------------------------------------------------------------
@@ -39,7 +40,7 @@ function MetricCard({
   }[color];
 
   return (
-    <div className="rounded border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-5 py-4">
+    <div className="h-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-4 sm:px-5">
       <p className="text-xs font-semibold uppercase text-gray-400 dark:text-gray-500">{label}</p>
       <p className={`mt-1.5 text-2xl font-bold tabular-nums ${valueColor}`}>{value}</p>
       {sub && <p className="mt-0.5 text-xs text-gray-400 dark:text-gray-500">{sub}</p>}
@@ -328,7 +329,7 @@ export function OracleAnalyticsDashboard({
         <h3 className="mb-3 text-sm font-semibold uppercase text-gray-400 dark:text-gray-500">
           Quality overview
         </h3>
-        {hasQualityData ? <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+        {hasQualityData ? <CardGrid layout="compact">
           <MetricCard
             label="Total verifications"
             value={quality.totalVerifications.toLocaleString()}
@@ -359,7 +360,7 @@ export function OracleAnalyticsDashboard({
             color={activeAnomalies > 0 ? "red" : "default"}
             sub={activeAnomalies === 0 ? "All clear" : "Require action"}
           />
-        </div> : (
+        </CardGrid> : (
           <DashboardEmptyState
             heading="No quality data yet"
             body="Quality metrics appear after an oracle provider processes its first verification."
@@ -392,7 +393,7 @@ export function OracleAnalyticsDashboard({
         <h3 className="mb-3 text-sm font-semibold uppercase text-gray-400 dark:text-gray-500">
           Verification throughput
         </h3>
-        <div className="rounded border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-5 py-4">
+        <div className="h-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-4 sm:px-5">
           <ThroughputChart points={throughput.slice(-24)} />
         </div>
       </div>
