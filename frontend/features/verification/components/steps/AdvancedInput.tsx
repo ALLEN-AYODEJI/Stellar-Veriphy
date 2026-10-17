@@ -13,8 +13,9 @@ export function AdvancedInput() {
     advancedContentHash,
     advancedManifestHash,
   } = useWizard();
-  const [contentHashInput, setContentHashInput] = useState("");
-  const [manifestHashInput, setManifestHashInput] = useState("");
+  // Seed from context so navigating back restores previously entered values.
+  const [contentHashInput, setContentHashInput] = useState(advancedContentHash);
+  const [manifestHashInput, setManifestHashInput] = useState(advancedManifestHash);
   const [contentHashError, setContentHashError] = useState("");
   const [manifestHashError, setManifestHashError] = useState("");
   const router = useRouter();

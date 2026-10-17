@@ -1,5 +1,6 @@
 "use client";
 
+import { DashboardWidgetSkeleton } from "@/components/ui/Skeleton";
 import type { DashboardMetrics } from "@/lib/provenance/data";
 import Link from "next/link";
 import { DashboardEmptyState } from "./DashboardEmptyState";
@@ -29,16 +30,33 @@ function formatDuration(seconds: number): string {
 export function MetricsCards({ metrics }: MetricsCardsProps) {
   if (!metrics) {
     return (
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="h-32 animate-pulse rounded-xl bg-gray-200 dark:bg-gray-800" />
-        ))}
+      <div className="space-y-4">
+        {/* Stat cards — 4 columns match the loaded layout */}
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <DashboardWidgetSkeleton key={i} />
+          ))}
+        </div>
+        {/* Sparkline / chart row — fixed height matches the loaded widget */}
+        <div
+          className="h-[88px] animate-pulse rounded-xl bg-gray-200 dark:bg-gray-800"
+          role="status"
+          aria-label="Loading chart"
+        >
+          <span className="sr-only">Loading chart…</span>
+        </div>
       </div>
     );
   }
 
   const hasVerificationData = metrics.dailyVerifications.some((count) => count > 0) || metrics.verifications24h > 0 || metrics.verificationsPrev24h > 0;
   const delta = metrics.verifications24h - metrics.verificationsPrev24h;
+
+  // Cards are ordered by priority for creator workflows:
+  //  1. Verification throughput  — the primary activity metric creators act on
+  //  2. Verification success rate — immediate quality signal
+  //  3. Certificates issued       — cumulative output; context for the above two
+  //  4. Avg. verification time    — operational detail; useful but secondary
   const cards = [
     {
       label: "Certificates issued",
@@ -64,6 +82,12 @@ export function MetricsCards({ metrics }: MetricsCardsProps) {
       hint: hasVerificationData ? "completed ÷ (completed + failed)" : "Submit content to calculate a success rate.",
       actionHref: hasVerificationData ? undefined : "/creator/upload-content",
       actionLabel: hasVerificationData ? undefined : "Upload content",
+    },
+    {
+      label: "Certificates issued",
+      value: metrics.totalCertificates.toLocaleString(),
+      unit: "total",
+      hint: `${metrics.activeCertificates.toLocaleString()} active`,
     },
     {
       label: "Avg. verification time",
