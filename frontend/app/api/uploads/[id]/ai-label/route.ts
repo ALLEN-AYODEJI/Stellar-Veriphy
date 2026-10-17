@@ -12,8 +12,8 @@
  * ## GET
  * Returns all labels and the resolved display label for the asset.
  */
-import { isPlainObject } from "@stellarveriphy/shared";
-import { respond, readJson, serverError } from "@/lib/server/http";
+import { enumField, requireObject, textField, type FieldError } from "@stellarveriphy/shared";
+import { respond, readJson, serverError, validationError } from "@/lib/server/http";
 import { logOperationalEvent, requestIdFrom } from "@/lib/server/observability";
 import { getUpload } from "@/lib/server/uploads";
 import { collection } from "@/lib/server/json-collection";
@@ -56,10 +56,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const parsed = await readJson(req);
   if ("response" in parsed) return parsed.response;
 
-  const body = parsed.body;
-  if (!isPlainObject(body)) {
-    return respond(422, { status: "validation_error", errors: [{ field: "body", message: "Expected a JSON object." }] });
-  }
+  const object = requireObject(parsed.body);
+  if (!object.ok) return validationError(object.errors);
+  const body = object.value;
 
   // Validate upload exists
   const upload = await getUpload(id);
@@ -67,48 +66,34 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return respond(404, { status: "not_found", message: "No upload exists with this ID." });
   }
 
-  // Validate generationType
-  const generationType = body.generationType as AiGenerationType;
-  if (!VALID_GENERATION_TYPES.includes(generationType)) {
-    return respond(422, {
-      status: "validation_error",
-      errors: [{ field: "generationType", message: `Must be one of: ${VALID_GENERATION_TYPES.join(", ")}.` }],
-    });
+  const errors: FieldError[] = [];
+  const generationType = enumField(body, "generationType", VALID_GENERATION_TYPES, { required: true }, errors);
+  const detectionSource =
+    enumField(body, "detectionSource", VALID_DETECTION_SOURCES, {}, errors) ?? "creator_declared";
+  const note = textField(body, "note", { maxLength: 1000 }, errors);
+  const modelName = textField(body, "modelName", {
+    required: detectionSource !== "creator_declared",
+    requiredMessage: "modelName is required for detector-produced labels.",
+    maxLength: 200,
+    singleLine: true,
+  }, errors);
+  const modelVersion = textField(body, "modelVersion", { maxLength: 100, singleLine: true }, errors);
+  if (body.confidence !== undefined && (typeof body.confidence !== "number" || body.confidence < 0 || body.confidence > 1)) {
+    errors.push({ field: "confidence", message: "confidence must be a number between 0 and 1." });
   }
-
-  // Validate detectionSource
-  const detectionSource = (body.detectionSource ?? "creator_declared") as DetectionSource;
-  if (!VALID_DETECTION_SOURCES.includes(detectionSource)) {
-    return respond(422, {
-      status: "validation_error",
-      errors: [{ field: "detectionSource", message: `Must be one of: ${VALID_DETECTION_SOURCES.join(", ")}.` }],
-    });
-  }
+  if (errors.length > 0 || !generationType) return validationError(errors);
 
   let label: AiLabel;
 
   if (detectionSource === "creator_declared") {
-    label = creatorDeclaredLabel(generationType, typeof body.note === "string" ? body.note : undefined);
+    label = creatorDeclaredLabel(generationType, note);
   } else {
-    const modelName = body.modelName;
-    if (typeof modelName !== "string" || modelName.trim() === "") {
-      return respond(422, {
-        status: "validation_error",
-        errors: [{ field: "modelName", message: "modelName is required for detector-produced labels." }],
-      });
-    }
     const confidence = typeof body.confidence === "number" ? body.confidence : 0.5;
-    if (confidence < 0 || confidence > 1) {
-      return respond(422, {
-        status: "validation_error",
-        errors: [{ field: "confidence", message: "confidence must be between 0 and 1." }],
-      });
-    }
     label = detectorLabel(
       generationType,
       confidence,
-      modelName.trim(),
-      typeof body.modelVersion === "string" ? body.modelVersion : undefined,
+      modelName!,
+      modelVersion,
       detectionSource,
     );
   }

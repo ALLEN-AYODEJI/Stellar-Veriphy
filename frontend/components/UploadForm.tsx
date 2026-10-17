@@ -8,11 +8,13 @@ import {
   validateUploadMetadata,
   type ContentManifest,
   type FieldError,
+  type UploadSessionView,
   type VerificationJobView,
 } from "@stellarveriphy/shared";
 import { useFileHash } from "@/hooks/useFileHash";
 import { useJobStatuses } from "@/hooks/useJobStatuses";
 import { ApiError, api } from "@/lib/api";
+import { completeUploadSession, findResumableSession, openUploadSession, uploadMissingChunks } from "@/lib/resumable-upload";
 import { trackJob } from "@/lib/tracked-jobs";
 import { Field } from "./Field";
 import { JobProgress } from "./JobProgress";
@@ -150,6 +152,11 @@ export function UploadForm() {
   const [submitting, setSubmitting] = useState(false);
   const [serverError, setServerError] = useState<ApiError | null>(null);
   const [submitted, setSubmitted] = useState<VerificationJobView | null>(null);
+  // Resumable upload state: the live session while submitting, and an unfinished
+  // session for the selected file found from an earlier, interrupted attempt.
+  const [uploadSession, setUploadSession] = useState<UploadSessionView | null>(null);
+  const [resumable, setResumable] = useState<UploadSessionView | null>(null);
+  const [restartUpload, setRestartUpload] = useState(false);
   const hashState = useFileHash(file);
   const { jobs } = useJobStatuses(submitted ? [submitted.id] : []);
 
@@ -217,6 +224,22 @@ export function UploadForm() {
   }, [file, hashState, values]);
 
   const validation = useMemo(() => validateUploadMetadata(payload), [payload]);
+  const sessionCreator = validation.ok ? validation.value.creator : "";
+  const sessionHash = validation.ok ? validation.value.contentHash : "";
+
+  useEffect(() => {
+    setResumable(null);
+    setRestartUpload(false);
+    if (!sessionCreator || !sessionHash) return;
+    let cancelled = false;
+    findResumableSession(sessionCreator, sessionHash).then(
+      (session) => !cancelled && setResumable(session && session.completedChunks.length > 0 ? session : null),
+      () => {},
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionCreator, sessionHash]);
   const clientErrors: FieldError[] = validation.ok ? [] : validation.errors;
   const allErrors = [...clientErrors, ...(serverError?.errors ?? [])];
 
@@ -296,7 +319,18 @@ export function UploadForm() {
     }
     setSubmitting(true);
     try {
-      const upload = await api.createUpload(validation.value);
+      const metadata = validation.value;
+      let session = await openUploadSession({
+        file: hashState.file,
+        contentHash: metadata.contentHash,
+        creator: metadata.creator,
+        mode: restartUpload ? "restart" : "resume",
+      });
+      setUploadSession(session);
+      session = await uploadMissingChunks({ file: hashState.file, session, onProgress: setUploadSession });
+      const upload = await api.createUpload(metadata);
+      setUploadSession(await completeUploadSession(session, upload.id));
+      setResumable(null);
       const job = await api.createJob(upload.id);
       trackJob({ id: job.id, label: upload.title ?? upload.fileName, submittedAt: job.createdAt });
       window.localStorage.removeItem(DRAFT_KEY);
@@ -502,6 +536,30 @@ export function UploadForm() {
         errors={allErrors}
       />
 
+      {resumable && !submitting && (
+        <div className="notice" role="status">
+          <p>
+            An earlier upload of this file stopped at {resumable.progress}%
+            {resumable.status === "expired" ? " and has expired, so it will start over." : "."}
+          </p>
+          {resumable.status !== "expired" && (
+            <div className="row">
+              <label>
+                <input type="radio" name="resumeMode" checked={!restartUpload} onChange={() => setRestartUpload(false)} /> Resume where it stopped
+              </label>
+              <label>
+                <input type="radio" name="resumeMode" checked={restartUpload} onChange={() => setRestartUpload(true)} /> Start over
+              </label>
+            </div>
+          )}
+        </div>
+      )}
+      {submitting && uploadSession && uploadSession.status === "in_progress" && (
+        <div role="progressbar" aria-label="Upload progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={uploadSession.progress}>
+          <progress max={100} value={uploadSession.progress} /> {uploadSession.progress}%
+          {uploadSession.attempt > 1 && ` (attempt ${uploadSession.attempt})`}
+        </div>
+      )}
       <button type="submit" disabled={submitting || hashState.status === "hashing"}>
         {submitting ? "Submitting…" : hashState.status === "hashing" ? "Hashing file…" : "Submit for verification"}
         {!submitting && hashState.status !== "hashing" && <ShortcutHint keys="Ctrl + Enter" />}

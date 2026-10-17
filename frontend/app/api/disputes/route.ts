@@ -1,15 +1,14 @@
 /**
- * GET  /api/disputes               — list disputes (filter by certificateId, status)
+ * GET  /api/disputes               — list disputes (filter by certificateId, status; paginated)
  * POST /api/disputes               — raise a new content dispute
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import type { ApiResponse } from "@stellarveriphy/shared/types";
-import type {
-  DisputeAuditEntry,
-  DisputeRecord,
-  RaiseDisputeRequest,
-} from "@/types/dispute";
+import type { DisputeAuditEntry, DisputeRecord } from "@/types/dispute";
+import { legacyValidationError } from "@/lib/server/http";
+import { paginate, parsePaginationParams } from "@stellarveriphy/shared";
+import { validateRaiseDispute } from "@/lib/server/validators";
 
 // ---------------------------------------------------------------------------
 // In-memory store (replace with DB in production)
@@ -48,6 +47,8 @@ export async function GET(
   request: NextRequest,
 ): Promise<NextResponse<ApiResponse<DisputeRecord[]>>> {
   const { searchParams } = new URL(request.url);
+  const pageParams = parsePaginationParams(searchParams);
+  if (!pageParams.ok) return legacyValidationError(pageParams.errors);
   const certificateId = searchParams.get("certificateId");
   const status = searchParams.get("status");
 
@@ -60,7 +61,8 @@ export async function GET(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
   );
 
-  return NextResponse.json({ success: true, data: items });
+  const page = paginate(items, pageParams.value);
+  return NextResponse.json({ success: true, data: page.items, pagination: page.pagination });
 }
 
 // ---------------------------------------------------------------------------
@@ -77,45 +79,15 @@ export async function POST(
     return NextResponse.json({ success: false, error: "Malformed JSON." }, { status: 400 });
   }
 
-  const b = body as RaiseDisputeRequest;
-
-  // Validate required fields
-  if (!b.certificateId?.trim()) {
-    return NextResponse.json(
-      { success: false, error: "certificateId is required." },
-      { status: 400 },
-    );
-  }
-  if (!b.contentHash?.trim()) {
-    return NextResponse.json(
-      { success: false, error: "contentHash is required." },
-      { status: 400 },
-    );
-  }
-  if (!b.trigger) {
-    return NextResponse.json(
-      { success: false, error: "trigger is required." },
-      { status: 400 },
-    );
-  }
-  if (!b.summary?.trim() || b.summary.trim().length < 20) {
-    return NextResponse.json(
-      { success: false, error: "summary must be at least 20 characters." },
-      { status: 400 },
-    );
-  }
-  if (b.summary.trim().length > 1000) {
-    return NextResponse.json(
-      { success: false, error: "summary must be 1000 characters or fewer." },
-      { status: 400 },
-    );
-  }
+  const validation = validateRaiseDispute(body);
+  if (!validation.ok) return legacyValidationError(validation.errors);
+  const b = validation.value;
 
   const now = new Date().toISOString();
   const disputeId = makeId("dsp");
 
   // Tag each evidence item with metadata
-  const evidence = (b.evidence ?? []).map((ev) => ({
+  const evidence = b.evidence.map((ev) => ({
     ...ev,
     id: makeId("ev"),
     attachedAt: now,
@@ -124,12 +96,12 @@ export async function POST(
 
   const record: DisputeRecord = {
     id: disputeId,
-    certificateId: b.certificateId.trim(),
-    contentHash: b.contentHash.trim(),
+    certificateId: b.certificateId,
+    contentHash: b.contentHash,
     status: "open",
     trigger: b.trigger,
-    summary: b.summary.trim(),
-    reportedBy: b.reportedBy?.trim() || undefined,
+    summary: b.summary,
+    reportedBy: b.reportedBy,
     evidence,
     createdAt: now,
     updatedAt: now,
@@ -143,7 +115,7 @@ export async function POST(
     id: makeId("aud"),
     disputeId,
     action: "raised",
-    actor: b.reportedBy?.trim() || "anonymous",
+    actor: b.reportedBy ?? "anonymous",
     timestamp: now,
     description: `Dispute raised with trigger "${b.trigger.replace(/_/g, " ")}". ${evidence.length > 0 ? `${evidence.length} evidence item(s) attached.` : "No initial evidence."}`,
   };
