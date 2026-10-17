@@ -1,4 +1,12 @@
-import type { FieldError, UploadMetadata, UploadRecord, VerificationJobView } from "@stellarveriphy/shared";
+import type {
+  FieldError,
+  UploadMetadata,
+  UploadRecord,
+  UploadSessionStart,
+  UploadSessionUpdate,
+  UploadSessionView,
+  VerificationJobView,
+} from "@stellarveriphy/shared";
 import { resolveApiEndpoint } from "@/config";
 
 export class ApiError extends Error {
@@ -63,10 +71,20 @@ async function request<T>(pathOrUrl: string, init?: RequestOptions): Promise<T> 
     const body = res ? await res.json().catch(() => null) : null;
     if (res?.ok) return body.data as T;
 
+    const retryAfter = Number(res?.headers.get("Retry-After") ?? body?.retryAfterSeconds);
+    const retryAfterSeconds = Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : undefined;
+    const rateLimitMessage =
+      status === 429 && retryAfterSeconds
+        ? `Too many requests. Please wait ${retryAfterSeconds} seconds before trying again.`
+        : undefined;
     lastError = new ApiError(
-      body?.message ?? (status === 0 ? "Could not reach the server. Check your connection and try again." : `Request failed (${status}).`),
+      rateLimitMessage ??
+        body?.message ??
+        body?.error ??
+        (status === 0 ? "Could not reach the server. Check your connection and try again." : `Request failed (${status}).`),
       status,
-      body?.errors ?? []
+      body?.errors ?? [],
+      retryAfterSeconds
     );
 
     if (attempt >= maxAttempts || !shouldRetry(status)) {
@@ -97,34 +115,19 @@ async function request<T>(pathOrUrl: string, init?: RequestOptions): Promise<T> 
       status,
     });
     await wait(delayMs);
-  let res: Response;
-  try {
-    res = await fetch(url, init);
-  } catch {
-    throw new ApiError("Could not reach the server. Check your connection and try again.", 0);
-  }
-  const body = await res.json().catch(() => null);
-  if (!res.ok) {
-    const retryAfter = Number(res.headers.get("Retry-After") ?? body?.retryAfterSeconds);
-    const retryAfterSeconds = Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : undefined;
-    const rateLimitMessage =
-      res.status === 429 && retryAfterSeconds
-        ? `Too many requests. Please wait ${retryAfterSeconds} seconds before trying again.`
-        : undefined;
-    throw new ApiError(
-      rateLimitMessage ?? body?.message ?? body?.error ?? `Request failed (${res.status}).`,
-      res.status,
-      body?.errors ?? [],
-      retryAfterSeconds
-    );
   }
 
   throw lastError ?? new ApiError("Request failed.", 0);
 }
 
-function postJson<T>(url: string, payload: unknown, options?: Pick<RequestOptions, "retry">): Promise<T> {
+function postJson<T>(
+  url: string,
+  payload: unknown,
+  options?: Pick<RequestOptions, "retry">,
+  method: "POST" | "PATCH" = "POST"
+): Promise<T> {
   return request<T>(url, {
-    method: "POST",
+    method,
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
     retry: options?.retry,
@@ -135,10 +138,15 @@ export const api = {
   createUpload: (metadata: UploadMetadata, options?: Pick<RequestOptions, "retry">) =>
     postJson<UploadRecord>("/api/uploads", metadata, options),
   findUploadsByHash: (contentHash: string) =>
-    request<UploadRecord[]>(`/api/uploads?contentHash=${encodeURIComponent(contentHash)}`),
+    request<UploadRecord[]>(`/api/uploads?contentHash=${encodeURIComponent(contentHash)}&pageSize=100`),
   getUpload: (id: string) => request<UploadRecord>(`/api/uploads/${encodeURIComponent(id)}`),
   createJob: (uploadId: string, options?: Pick<RequestOptions, "retry">) =>
     postJson<VerificationJobView>("/api/jobs", { uploadId }, options),
   getJobs: (ids: string[]) =>
     request<VerificationJobView[]>(`/api/jobs?ids=${ids.map(encodeURIComponent).join(",")}`),
+  startUploadSession: (start: Omit<UploadSessionStart, "chunkSize"> & { chunkSize?: number }, options?: Pick<RequestOptions, "retry">) =>
+    postJson<UploadSessionView>("/api/uploads/sessions", start, options),
+  getUploadSession: (id: string) => request<UploadSessionView>(`/api/uploads/sessions/${encodeURIComponent(id)}`),
+  updateUploadSession: (id: string, update: UploadSessionUpdate, options?: Pick<RequestOptions, "retry">) =>
+    postJson<UploadSessionView>(`/api/uploads/sessions/${encodeURIComponent(id)}`, update, options, "PATCH"),
 };

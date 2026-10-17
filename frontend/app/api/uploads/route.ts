@@ -1,5 +1,5 @@
-import { checkSha256Hex, normalizeHash, validateUploadMetadata, type UploadRecord } from "@stellarveriphy/shared";
-import { readJson, respond, serverError } from "@/lib/server/http";
+import { paginate, sha256Field, validateUploadMetadata, type FieldError, type UploadRecord } from "@stellarveriphy/shared";
+import { readJson, readPagination, respond, serverError, validationError } from "@/lib/server/http";
 import { logOperationalEvent, requestIdFrom } from "@/lib/server/observability";
 import { findUploadsByHash, saveUpload } from "@/lib/server/uploads";
 
@@ -31,11 +31,7 @@ export async function POST(req: Request) {
         errorCount: result.errors.length,
       },
     });
-    return respond(422, {
-      status: "validation_error",
-      message: "Upload metadata is invalid. See `errors` for details.",
-      errors: result.errors,
-    });
+    return validationError(result.errors, "Upload metadata is invalid. See `errors` for details.");
   }
 
   try {
@@ -69,23 +65,23 @@ export async function POST(req: Request) {
   }
 }
 
-// GET /api/uploads?contentHash=<sha256>: look up stored records for a file hash.
+// GET /api/uploads?contentHash=<sha256>: look up stored records for a file hash (paginated).
 export async function GET(req: Request) {
-  const raw = new URL(req.url).searchParams.get("contentHash");
-  if (!raw) {
-    return respond(422, {
-      status: "validation_error",
-      errors: [{ field: "contentHash", message: "The contentHash query parameter is required." }],
-    });
-  }
-  const contentHash = normalizeHash(raw);
-  const problem = checkSha256Hex(contentHash);
-  if (problem) {
-    return respond(422, { status: "validation_error", errors: [{ field: "contentHash", ...problem }] });
-  }
+  const searchParams = new URL(req.url).searchParams;
+  const errors: FieldError[] = [];
+  const contentHash = sha256Field(
+    { contentHash: searchParams.get("contentHash") },
+    "contentHash",
+    { required: true, requiredMessage: "The contentHash query parameter is required." },
+    errors,
+  );
+  if (!contentHash) return validationError(errors);
+  const pageParams = readPagination(req);
+  if ("response" in pageParams) return pageParams.response;
 
   try {
-    return respond<UploadRecord[]>(200, { status: "ok", data: await findUploadsByHash(contentHash) });
+    const page = paginate(await findUploadsByHash(contentHash), pageParams.value);
+    return respond<UploadRecord[]>(200, { status: "ok", data: page.items, pagination: page.pagination });
   } catch (err) {
     return serverError("GET /api/uploads", err);
   }

@@ -1,3 +1,6 @@
+import type { PaginationMeta } from "../validation/pagination";
+import type { FieldError } from "../validation/result";
+
 // ---------------------------------------------------------------------------
 // Core content manifest
 // ---------------------------------------------------------------------------
@@ -177,9 +180,11 @@ export interface OracleVerificationJob {
 // ApiResponse — generic wrapper
 // ---------------------------------------------------------------------------
 
+// `pagination` is present on collection endpoints (docs/api/pagination.md);
+// `errors` lists field-level problems when the request failed validation.
 export type ApiResponse<T> =
-  | { success: true; data: T; error?: never }
-  | { success: false; error: string; data?: never };
+  | { success: true; data: T; error?: never; pagination?: PaginationMeta }
+  | { success: false; error: string; data?: never; errors?: FieldError[] };
 
 // ---------------------------------------------------------------------------
 // SLA tracking
