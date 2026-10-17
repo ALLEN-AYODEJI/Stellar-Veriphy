@@ -4,8 +4,10 @@ import { computeConfidence } from "@stellarveriphy/shared/scoring";
 import type { ProvenanceEventType, VerificationRecord } from "@stellarveriphy/shared/types";
 import ConfidenceExplanation from "@/components/ConfidenceExplanation";
 import ConfidenceScore from "@/components/ConfidenceScore";
+import { CopyButton } from "@/components/CopyButton";
 import { OwnershipTransferPanel } from "@/components/certificates/OwnershipTransferPanel";
 import StatusBadge from "@/components/StatusBadge";
+import Breadcrumbs from "@/components/ui/Breadcrumbs";
 import { getRecord, SAMPLE_RECORDS } from "@/lib/sample-records";
 import { parseVerificationUrlContext } from "@/lib/shareableUrl";
 
@@ -121,6 +123,7 @@ export default async function ShareableVerificationPage({
 
   return (
     <main className="mx-auto max-w-5xl px-4 py-10">
+      <Breadcrumbs items={[{ label: "Verify", href: "/verify" }, { label: "Verification result" }]} />
       {/* Contextual permissions banner */}
       <div
         className={`mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 rounded-xl p-4 border text-sm ${
@@ -186,7 +189,10 @@ export default async function ShareableVerificationPage({
           <Section title="Asset Manifest & Provenance">
             <dl className="divide-y divide-slate-100 dark:divide-gray-800">
               <Field label="Original creator" mono>
-                {manifest.creator}
+                <span className="inline-flex max-w-full items-center gap-1">
+                  <span className="min-w-0 break-all">{manifest.creator}</span>
+                  <CopyButton text={manifest.creator} label="Copy creator wallet address" />
+                </span>
               </Field>
               <Field label="Content Hash" mono>
                 {manifest.contentHash}

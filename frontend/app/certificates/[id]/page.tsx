@@ -5,8 +5,10 @@ import { computeConfidence, metadataCompleteness, STANDARD_METADATA_FIELDS } fro
 import type { ProvenanceEventType, VerificationRecord } from "@stellarveriphy/shared/types";
 import ConfidenceExplanation from "@/components/ConfidenceExplanation";
 import ConfidenceScore from "@/components/ConfidenceScore";
+import { CopyButton } from "@/components/CopyButton";
 import StatusBadge from "@/components/StatusBadge";
 import { OwnershipTransferPanel } from "@/components/certificates/OwnershipTransferPanel";
+import Breadcrumbs from "@/components/ui/Breadcrumbs";
 import { getRecord } from "@/lib/sample-records";
 
 type Params = Promise<{ id: string }>;
@@ -86,6 +88,7 @@ export default async function CertificateDetail({ params }: { params: Params }) 
 
   return (
     <main className="mx-auto max-w-5xl px-4 py-10">
+      <Breadcrumbs items={[{ label: "Explore", href: "/explore" }, { label: "Certificate" }]} />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Link href="/explore" className="text-sm text-indigo-700 hover:underline">
           <span aria-hidden="true">← </span>Back to explore
@@ -157,7 +160,10 @@ export default async function CertificateDetail({ params }: { params: Params }) 
           <Section title="Provenance">
             <dl className="divide-y divide-slate-100">
               <Field label="Original creator" mono>
-                {manifest.creator}
+                <span className="inline-flex max-w-full items-center gap-1">
+                  <span className="min-w-0 break-all">{manifest.creator}</span>
+                  <CopyButton text={manifest.creator} label="Copy creator wallet address" />
+                </span>
               </Field>
               <Field label="Created">{formatDate(manifest.timestamp)}</Field>
               {STANDARD_METADATA_FIELDS.map((key) => (

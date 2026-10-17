@@ -3,6 +3,7 @@
 import { useEffect, useId, useState } from "react";
 
 import { WalletSelector } from "@/components/wallet/WalletSelector";
+import { CopyButton } from "@/components/CopyButton";
 import { useWallet } from "@/context/WalletContext";
 import {
   getCertificateOwner,
@@ -90,9 +91,10 @@ export function OwnershipTransferPanel({
     <div className="space-y-4">
       <div>
         <p className="text-sm font-medium text-slate-700">Current owner</p>
-        <p className="mt-1 break-all font-mono text-sm text-slate-900" aria-live="polite">
-          {currentOwner}
-        </p>
+        <div className="mt-1 flex items-start gap-1" aria-live="polite">
+          <p className="min-w-0 break-all font-mono text-sm text-slate-900">{currentOwner}</p>
+          <CopyButton text={currentOwner} label="Copy current owner wallet address" />
+        </div>
       </div>
 
       <p className="border-l-2 border-amber-400 pl-3 text-sm text-amber-900" role="note">
