@@ -14,6 +14,7 @@ import type {
   OracleAnomaly,
   OracleThroughputPoint,
 } from "@stellarveriphy/shared";
+import { DashboardEmptyState } from "./DashboardEmptyState";
 
 // ---------------------------------------------------------------------------
 // Metric card
@@ -74,9 +75,12 @@ function HealthBadge({ status }: { status: OracleAttestationHealth["status"] }) 
 function ProviderHealthTable({ providers }: { providers: OracleAttestationHealth[] }) {
   if (providers.length === 0) {
     return (
-      <p className="py-6 text-center text-sm text-gray-400 dark:text-gray-500">
-        No provider health data available.
-      </p>
+      <DashboardEmptyState
+        heading="No provider health data yet"
+        body="Provider health appears after at least one oracle provider has processed a verification."
+        actionLabel="Open oracle registry"
+        actionHref="/oracles"
+      />
     );
   }
 
@@ -152,9 +156,12 @@ function ProviderHealthTable({ providers }: { providers: OracleAttestationHealth
 function ThroughputChart({ points }: { points: OracleThroughputPoint[] }) {
   if (points.length === 0) {
     return (
-      <p className="py-6 text-center text-sm text-gray-400 dark:text-gray-500">
-        No throughput data available.
-      </p>
+      <DashboardEmptyState
+        heading="No throughput data yet"
+        body="This chart fills after providers receive verification work."
+        actionLabel="Open oracle registry"
+        actionHref="/oracles"
+      />
     );
   }
 
@@ -217,6 +224,16 @@ const ANOMALY_CONFIG = {
 
 function AnomalyList({ anomalies }: { anomalies: OracleAnomaly[] }) {
   const active = anomalies.filter((a) => !a.resolved);
+  if (anomalies.length === 0) {
+    return (
+      <DashboardEmptyState
+        heading="No anomaly history yet"
+        body="Anomalies will appear here when analytics has enough provider activity to detect an issue."
+        actionLabel="Refresh analytics"
+        actionHref="/oracles/analytics"
+      />
+    );
+  }
   if (active.length === 0) {
     return (
       <p className="text-sm text-emerald-700 dark:text-emerald-400 font-medium">
@@ -272,6 +289,7 @@ export function OracleAnalyticsDashboard({
 }: OracleAnalyticsDashboardProps) {
   const { quality, providerHealth, throughput, anomalies, snapshotAt } = data;
   const activeAnomalies = anomalies.filter((a) => !a.resolved).length;
+  const hasQualityData = quality.totalVerifications > 0 || providerHealth.length > 0 || throughput.length > 0;
 
   return (
     <section className="space-y-8" aria-label="Oracle analytics dashboard">
@@ -310,7 +328,7 @@ export function OracleAnalyticsDashboard({
         <h3 className="mb-3 text-sm font-semibold uppercase text-gray-400 dark:text-gray-500">
           Quality overview
         </h3>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+        {hasQualityData ? <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
           <MetricCard
             label="Total verifications"
             value={quality.totalVerifications.toLocaleString()}
@@ -341,7 +359,14 @@ export function OracleAnalyticsDashboard({
             color={activeAnomalies > 0 ? "red" : "default"}
             sub={activeAnomalies === 0 ? "All clear" : "Require action"}
           />
-        </div>
+        </div> : (
+          <DashboardEmptyState
+            heading="No quality data yet"
+            body="Quality metrics appear after an oracle provider processes its first verification."
+            actionLabel="Open oracle registry"
+            actionHref="/oracles"
+          />
+        )}
       </div>
 
       {/* Anomalies */}

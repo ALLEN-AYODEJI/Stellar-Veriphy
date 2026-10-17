@@ -16,6 +16,7 @@ import {
   type TrustScoreConfig,
   type TrustTier,
 } from "@stellarveriphy/shared";
+import { DashboardEmptyState } from "./DashboardEmptyState";
 
 const TIER_STYLES: Record<TrustTier, string> = {
   high: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300",
@@ -154,6 +155,28 @@ export function ProviderTrustDashboard() {
   const risky = data.scores.filter((s) => s.highRisk);
   const others = data.scores.filter((s) => !s.highRisk);
 
+  if (data.scores.length === 0) {
+    return (
+      <div className="space-y-6">
+        <DashboardEmptyState
+          heading="No provider trust scores yet"
+          body="Trust scores are calculated after providers are registered and have verification history to evaluate."
+          actionLabel="Open oracle registry"
+          actionHref="/oracles"
+        />
+        <details className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
+          <summary className="cursor-pointer text-sm font-semibold text-gray-900 dark:text-gray-100">
+            Tune model weights (preview only)
+          </summary>
+          <p className="mt-2 text-xs text-gray-500">
+            Weights are normalised to sum to 100%. Changes here only preview results — adopt new defaults by editing
+            <code className="mx-1">DEFAULT_TRUST_CONFIG</code> in packages/shared/scoring/providerTrust.ts.
+          </p>
+        </details>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <p className="text-xs text-gray-500">
@@ -179,7 +202,12 @@ export function ProviderTrustDashboard() {
           Providers ({others.length})
         </h2>
         {others.length === 0 ? (
-          <p className="text-xs text-gray-500">No providers currently meet the trust threshold.</p>
+          <DashboardEmptyState
+            heading="No providers meet the trust threshold"
+            body="Every scored provider currently needs review before it can appear in the trusted list."
+            actionLabel="Review high-risk providers"
+            actionHref="#risky-heading"
+          />
         ) : (
           <ul className="space-y-2">
             {others.map((s) => (

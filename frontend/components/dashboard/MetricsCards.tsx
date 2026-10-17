@@ -1,6 +1,8 @@
 "use client";
 
 import type { DashboardMetrics } from "@/lib/provenance/data";
+import Link from "next/link";
+import { DashboardEmptyState } from "./DashboardEmptyState";
 
 interface MetricsCardsProps {
   metrics: DashboardMetrics | null;
@@ -35,32 +37,41 @@ export function MetricsCards({ metrics }: MetricsCardsProps) {
     );
   }
 
+  const hasVerificationData = metrics.dailyVerifications.some((count) => count > 0) || metrics.verifications24h > 0 || metrics.verificationsPrev24h > 0;
   const delta = metrics.verifications24h - metrics.verificationsPrev24h;
   const cards = [
     {
       label: "Certificates issued",
-      value: metrics.totalCertificates.toLocaleString(),
+      value: metrics.totalCertificates > 0 ? metrics.totalCertificates.toLocaleString() : "—",
       unit: "total",
-      hint: `${metrics.activeCertificates.toLocaleString()} active`,
+      hint: metrics.totalCertificates > 0 ? `${metrics.activeCertificates.toLocaleString()} active` : "Upload content to issue your first certificate.",
+      actionHref: metrics.totalCertificates > 0 ? undefined : "/creator/upload-content",
+      actionLabel: metrics.totalCertificates > 0 ? undefined : "Upload content",
     },
     {
       label: "Verification throughput",
-      value: metrics.verifications24h.toLocaleString(),
+      value: hasVerificationData ? metrics.verifications24h.toLocaleString() : "—",
       unit: "per 24 h",
-      hint: `${delta >= 0 ? "▲" : "▼"} ${Math.abs(delta)} vs previous 24 h`,
+      hint: hasVerificationData ? `${delta >= 0 ? "▲" : "▼"} ${Math.abs(delta)} vs previous 24 h` : "Submit content to start processing verifications.",
       hintClass: delta >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400",
+      actionHref: hasVerificationData ? undefined : "/creator/upload-content",
+      actionLabel: hasVerificationData ? undefined : "Upload content",
     },
     {
       label: "Verification success rate",
-      value: metrics.successRate.toFixed(1),
+      value: hasVerificationData ? metrics.successRate.toFixed(1) : "—",
       unit: "%",
-      hint: "completed ÷ (completed + failed)",
+      hint: hasVerificationData ? "completed ÷ (completed + failed)" : "Submit content to calculate a success rate.",
+      actionHref: hasVerificationData ? undefined : "/creator/upload-content",
+      actionLabel: hasVerificationData ? undefined : "Upload content",
     },
     {
       label: "Avg. verification time",
-      value: formatDuration(metrics.avgVerificationSeconds),
+      value: hasVerificationData ? formatDuration(metrics.avgVerificationSeconds) : "—",
       unit: "submit → attested",
-      hint: "across all verifications",
+      hint: hasVerificationData ? "across all verifications" : "Complete a verification to measure processing time.",
+      actionHref: hasVerificationData ? undefined : "/creator/upload-content",
+      actionLabel: hasVerificationData ? undefined : "Upload content",
     },
   ];
 
@@ -78,6 +89,11 @@ export function MetricsCards({ metrics }: MetricsCardsProps) {
               <span className="text-sm text-gray-500 dark:text-gray-400">{c.unit}</span>
             </p>
             <p className={`mt-1 text-xs ${c.hintClass ?? "text-gray-500 dark:text-gray-400"}`}>{c.hint}</p>
+            {c.actionHref && c.actionLabel && (
+              <Link href={c.actionHref} className="mt-3 inline-flex min-h-11 items-center text-xs font-medium text-blue-700 underline-offset-2 hover:underline focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-blue-400">
+                {c.actionLabel} →
+              </Link>
+            )}
           </div>
         ))}
       </div>
@@ -88,7 +104,16 @@ export function MetricsCards({ metrics }: MetricsCardsProps) {
             {metrics.dailyVerifications.reduce((a, b) => a + b, 0)} total
           </p>
         </div>
-        <Sparkline values={metrics.dailyVerifications} />
+        {hasVerificationData ? (
+          <Sparkline values={metrics.dailyVerifications} />
+        ) : (
+          <DashboardEmptyState
+            heading="No verification history yet"
+            body="This chart stays empty until a verification is submitted and completed."
+            actionLabel="Upload content"
+            actionHref="/creator/upload-content"
+          />
+        )}
       </div>
     </div>
   );
