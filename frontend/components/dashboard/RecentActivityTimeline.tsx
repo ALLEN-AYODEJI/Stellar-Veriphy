@@ -10,6 +10,7 @@ import {
   shortKey,
   type EventCategory,
 } from "@/lib/provenance/data";
+import { DashboardEmptyState } from "./DashboardEmptyState";
 
 const CATEGORY_STYLE: Record<EventCategory, string> = {
   verification: "bg-blue-500",
@@ -78,7 +79,23 @@ export function RecentActivityTimeline({ events, limit = 30 }: RecentActivityTim
       </div>
 
       {groups.length === 0 ? (
-        <p className="mt-6 text-sm text-gray-500 dark:text-gray-400">No activity for this filter.</p>
+        <div className="mt-5">
+          {events.length === 0 ? (
+            <DashboardEmptyState
+              heading="No activity yet"
+              body="Your verification and certificate activity will appear here after you upload content."
+              actionLabel="Upload content"
+              actionHref="/creator/upload-content"
+            />
+          ) : (
+            <DashboardEmptyState
+              heading={`No ${FILTERS.find((item) => item.key === filter)?.label.toLowerCase()} activity yet`}
+              body="This filter has no matching events. Choose All or try another filter to see the available activity."
+              actionLabel="Show all activity"
+              onAction={() => setFilter("all")}
+            />
+          )}
+        </div>
       ) : (
         <div className="mt-4 space-y-5">
           {groups.map(([day, dayEvents]) => (

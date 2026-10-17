@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   SUPPORTED_MEDIA_TYPES,
   UPLOAD_LIMITS,
@@ -81,8 +81,67 @@ function toIsoTimestamp(local: string): string {
   return Number.isNaN(date.getTime()) ? local : date.toISOString();
 }
 
+function fileSelectionIssue(file: File): string | null {
+  const mimeType = file.type.split(";")[0].trim().toLowerCase();
+  const extensions = SUPPORTED_MEDIA_TYPES[mimeType];
+  const extension = file.name.slice(file.name.lastIndexOf(".")).toLowerCase();
+  if (!extensions || !extensions.includes(extension)) {
+    return "This file type or extension is not supported. Choose an accepted image, video, audio, or PDF file.";
+  }
+  if (file.size <= 0) return "This file is empty. Choose a file that has content.";
+  if (file.size > UPLOAD_LIMITS.maxFileSizeBytes) {
+    return `This file is larger than the ${UPLOAD_LIMITS.maxFileSizeBytes / (1024 * 1024)} MB limit.`;
+  }
+  return null;
+}
+
+function MetadataPreview({
+  payload,
+  validation,
+  errors,
+}: {
+  payload: Record<string, unknown>;
+  validation: ReturnType<typeof validateUploadMetadata>;
+  errors: FieldError[];
+}) {
+  const preview = validation.ok ? validation.value : payload;
+  return (
+    <details open className="card">
+      <summary className="cursor-pointer font-semibold">Metadata preview</summary>
+      <p className="mt-2 text-sm muted">
+        {validation.ok
+          ? "This is the exact normalized JSON that will be submitted for verification."
+          : "This is the current submission draft. Fix the fields below before publishing it."}
+      </p>
+      <pre className="mt-3 max-h-80 overflow-auto rounded-lg bg-gray-100 p-4 text-xs leading-relaxed text-gray-800 dark:bg-gray-900 dark:text-gray-200">
+        {JSON.stringify(preview, null, 2)}
+      </pre>
+      {errors.length > 0 && (
+        <div className="notice notice-error mt-4" role="alert">
+          <p><strong>Review these metadata fields:</strong></p>
+          <ul>
+            {errors.map((error) => {
+              const input = FIELD_FOR_PATH[error.field] ?? error.field;
+              return (
+                <li key={`${error.field}-${error.message}`}>
+                  <a href={`#${input}`}>{error.field}: {error.message}</a>
+                  {error.hint && <span className="hint"> {error.hint}</span>}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+    </details>
+  );
+}
+
 export function UploadForm() {
   const [file, setFile] = useState<File | null>(null);
+  const [isDragActive, setIsDragActive] = useState(false);
+  const [dragInvalid, setDragInvalid] = useState(false);
+  const [fileSelectionError, setFileSelectionError] = useState<string | null>(null);
+  const dragDepth = useRef(0);
   const [values, setValues] = useState<FormValues>(() => emptyValues());
   const [restoredDraft, setRestoredDraft] = useState<DraftState | null>(null);
   const [touched, setTouched] = useState<Set<string>>(new Set());
@@ -177,12 +236,53 @@ export function UploadForm() {
     inputErrors.file = { field: "file", message: hashState.message };
   }
 
+  const visibleFileError = fileSelectionError ?? inputErrors.file?.message;
+
   const inputProps = (name: string) => ({
     id: name,
-    "aria-invalid": !!inputErrors[name],
-    "aria-describedby": `${name}-desc`,
+    "aria-invalid": !!inputErrors[name] || (name === "file" && Boolean(visibleFileError)),
+    "aria-describedby": name === "file" ? "file-desc file-drop-status" : `${name}-desc`,
     onBlur: touch(name),
   });
+
+  const setSelectedFile = (selectedFile: File | undefined) => {
+    if (!selectedFile) return;
+    const issue = fileSelectionIssue(selectedFile);
+    setDragInvalid(Boolean(issue));
+    setFileSelectionError(issue);
+    setFile(selectedFile);
+    touch("file")();
+    setServerError(null);
+  };
+
+  const handleDragEnter = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    dragDepth.current += 1;
+    setIsDragActive(true);
+    const item = event.dataTransfer.items[0];
+    const mimeType = item?.type.split(";")[0].trim().toLowerCase();
+    setDragInvalid(Boolean(item && item.kind === "file" && (!mimeType || !SUPPORTED_MEDIA_TYPES[mimeType])));
+  };
+
+  const handleDragLeave = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    dragDepth.current -= 1;
+    if (dragDepth.current <= 0) {
+      dragDepth.current = 0;
+      setIsDragActive(false);
+      setDragInvalid(false);
+    }
+  };
+
+  const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    dragDepth.current = 0;
+    setIsDragActive(false);
+    setSelectedFile(event.dataTransfer.files[0]);
+  };
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -282,16 +382,60 @@ export function UploadForm() {
           help={`Images, video, audio or PDF up to ${UPLOAD_LIMITS.maxFileSizeBytes / (1024 * 1024)} MB. The file is hashed in your browser.`}
           error={inputErrors.file}
         >
-          <input
-            type="file"
-            accept={ACCEPT}
-            {...inputProps("file")}
-            onChange={(e) => {
-              setFile(e.target.files?.[0] ?? null);
-              touch("file")();
-              setServerError(null);
+          <div
+            role="button"
+            tabIndex={0}
+            aria-label="Choose a media file, or drop one here"
+            aria-invalid={Boolean(visibleFileError)}
+            aria-describedby="file-desc file-drop-status"
+            onClick={() => document.getElementById("file")?.click()}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                document.getElementById("file")?.click();
+              }
             }}
-          />
+            onDragEnter={handleDragEnter}
+            onDragOver={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              event.dataTransfer.dropEffect = "copy";
+              setIsDragActive(true);
+              const item = event.dataTransfer.items[0];
+              const mimeType = item?.type.split(";")[0].trim().toLowerCase();
+              setDragInvalid(Boolean(item && item.kind === "file" && (!mimeType || !SUPPORTED_MEDIA_TYPES[mimeType])));
+            }}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            className={`rounded-lg border-2 border-dashed px-4 py-5 text-center transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 ${
+              visibleFileError || dragInvalid
+                ? "border-red-500 bg-red-50 text-red-800 dark:border-red-400 dark:bg-red-950/40 dark:text-red-200"
+                : isDragActive
+                  ? "border-blue-600 bg-blue-50 text-blue-900 dark:border-blue-400 dark:bg-blue-950/40 dark:text-blue-100"
+                  : "border-gray-300 bg-gray-50 text-gray-700 hover:border-blue-500 hover:bg-blue-50 dark:border-gray-600 dark:bg-gray-900/40 dark:text-gray-200 dark:hover:border-blue-400 dark:hover:bg-blue-950/30"
+            }`}
+          >
+            <input
+              type="file"
+              accept={ACCEPT}
+              {...inputProps("file")}
+              className="sr-only"
+              onClick={(event) => event.stopPropagation()}
+              onChange={(event) => setSelectedFile(event.target.files?.[0])}
+            />
+            <p id="file-drop-status" className="text-sm font-medium" aria-live="polite">
+              {visibleFileError || dragInvalid
+                ? visibleFileError ?? "This file type is not supported"
+                : isDragActive
+                  ? "Release to add this file"
+                  : file
+                    ? `Selected: ${file.name}`
+                    : "Drop a media file here, or choose one"}
+            </p>
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              Images, video, audio, or PDF · up to {UPLOAD_LIMITS.maxFileSizeBytes / (1024 * 1024)} MB
+            </p>
+          </div>
         </Field>
         {file && (
           <MediaSnapshotPreview
@@ -340,6 +484,12 @@ export function UploadForm() {
           <input type="text" value={values.aiModel} onChange={set("aiModel")} {...inputProps("aiModel")} />
         </Field>
       </fieldset>
+
+      <MetadataPreview
+        payload={payload}
+        validation={validation}
+        errors={allErrors}
+      />
 
       <button type="submit" disabled={submitting || hashState.status === "hashing"}>
         {submitting ? "Submitting…" : hashState.status === "hashing" ? "Hashing file…" : "Submit for verification"}
