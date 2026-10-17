@@ -99,6 +99,20 @@ StellarVeriphy/
 │   ├── tsconfig.json
 │   └── package.json
 │
+├── backend/                      # Node.js service: health checks, job queue, retention, metrics
+│   ├── src/
+│   │   ├── db/                   # MongoDB connection, index definitions, repositories
+│   │   ├── health/               # External dependency health checks
+│   │   ├── jobs/                 # MongoDB-backed job queue, workers, queue monitor
+│   │   ├── maintenance/          # Scheduled retention cleanup
+│   │   ├── scripts/              # db:indexes, retention:cleanup CLIs
+│   │   └── server.ts             # /health, /metrics, /admin, /api routes
+│   ├── .env.example
+│   └── package.json
+│
+├── docs/operations/              # Runbooks: health checks, job queue, retention, indexes
+├── infra/prometheus/alerts.yml   # Prometheus alert rules
+│
 ├── contracts/                    # Soroban smart contracts (Rust)
 │   ├── oracle/                   # Verification request + attestation
 │   │   ├── src/lib.rs
@@ -215,6 +229,17 @@ pnpm install
 pnpm dev:frontend
 # opens at http://localhost:3000
 ```
+
+### Run Backend
+
+Requires MongoDB. Configuration is read from environment variables; see `backend/.env.example` for the full list and defaults.
+
+```bash
+pnpm dev:backend
+# http://localhost:4000/health, /health/ready, /metrics
+```
+
+Operations docs: [health checks](docs/operations/health-checks.md) · [job queue](docs/operations/job-queue.md) · [data retention](docs/operations/data-retention.md) · [database indexes](docs/operations/database-indexes.md)
 
 ### Build Soroban Contracts
 

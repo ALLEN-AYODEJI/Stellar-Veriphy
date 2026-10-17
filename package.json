@@ -5,6 +5,8 @@
   "scripts": {
     "dev:frontend": "pnpm --filter frontend dev",
     "build:frontend": "pnpm --filter frontend build",
+    "dev:backend": "pnpm --filter backend dev",
+    "build:backend": "pnpm --filter backend build",
     "build:frontend:analyze": "pnpm --filter frontend run build:analyze",
     "build:contracts": "cd contracts/oracle && stellar contract build && cd ../provenance && stellar contract build && cd ../registry && stellar contract build",
     "docs:contracts": "cargo doc --manifest-path contracts/oracle/Cargo.toml --no-deps && cargo doc --manifest-path contracts/provenance/Cargo.toml --no-deps && cargo doc --manifest-path contracts/registry/Cargo.toml --no-deps",
