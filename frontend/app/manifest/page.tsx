@@ -37,9 +37,6 @@ export default function ManifestPage() {
     key: "manifest-form",
     data: manifest,
     interval: 20000,
-    onSave: () => {
-      showToast("Manifest saved successfully", "success");
-    },
   });
 
   useEffect(() => {

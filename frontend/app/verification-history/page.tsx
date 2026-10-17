@@ -67,7 +67,8 @@ export default function VerificationHistoryPage() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `verification-history-${Date.now()}.json`;
+    const dateStr = new Date().toISOString().slice(0, 10);
+    link.download = `verification-history-${dateStr}.json`;
     link.click();
     URL.revokeObjectURL(url);
   };
