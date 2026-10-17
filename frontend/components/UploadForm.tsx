@@ -17,6 +17,7 @@ import { trackJob } from "@/lib/tracked-jobs";
 import { Field } from "./Field";
 import { JobProgress } from "./JobProgress";
 import { MediaSnapshotPreview } from "./MediaSnapshotPreview";
+import { ShortcutHint } from "./ui/ShortcutHint";
 
 // Maps validation paths from the shared schema to the form input that fixes them.
 const FIELD_FOR_PATH: Record<string, string> = {
@@ -332,7 +333,17 @@ export function UploadForm() {
   const summaryErrors = Object.entries(submitAttempted || serverError ? inputErrors : {});
 
   return (
-    <form onSubmit={onSubmit} noValidate className="form">
+    <form
+      onSubmit={onSubmit}
+      onKeyDown={(e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key === "Enter" && !submitting && hashState.status !== "hashing") {
+          e.preventDefault();
+          e.currentTarget.requestSubmit();
+        }
+      }}
+      noValidate
+      className="form"
+    >
       {(summaryErrors.length > 0 || serverError) && (
         <div className="notice notice-error" role="alert">
           <p><strong>{serverError && serverError.errors.length === 0 ? serverError.message : "Please fix the following before submitting:"}</strong></p>
@@ -447,10 +458,10 @@ export function UploadForm() {
         {hashState.status === "done" && (
           <p className="muted">SHA-256: <code className="hash">{hashState.hash}</code></p>
         )}
-        <Field id="title" label="Title (optional)" error={inputErrors.title}>
+        <Field id="title" label="Title (optional)" help="A short name helps you recognize this asset later." error={inputErrors.title}>
           <input type="text" value={values.title} onChange={set("title")} maxLength={UPLOAD_LIMITS.titleMaxLength} {...inputProps("title")} />
         </Field>
-        <Field id="description" label="Description (optional)" error={inputErrors.description}>
+        <Field id="description" label="Description (optional)" help="Add useful context about what this file contains." error={inputErrors.description}>
           <textarea value={values.description} onChange={set("description")} rows={3} {...inputProps("description")} />
         </Field>
         <Field id="tags" label="Tags (optional)" help="Separate tags with commas." error={inputErrors.tags}>
@@ -474,13 +485,13 @@ export function UploadForm() {
         <Field id="capturedAt" label="Created at" help="When the content was captured or made." error={inputErrors.capturedAt}>
           <input type="datetime-local" value={values.capturedAt} onChange={set("capturedAt")} {...inputProps("capturedAt")} />
         </Field>
-        <Field id="device" label="Device (optional)" error={inputErrors.device}>
+        <Field id="device" label="Device (optional)" help="The camera, phone, or tool used to create the content." error={inputErrors.device}>
           <input type="text" value={values.device} onChange={set("device")} {...inputProps("device")} />
         </Field>
-        <Field id="location" label="Location (optional)" error={inputErrors.location}>
+        <Field id="location" label="Location (optional)" help="Where the content was created. Leave blank if you prefer not to share it." error={inputErrors.location}>
           <input type="text" value={values.location} onChange={set("location")} {...inputProps("location")} />
         </Field>
-        <Field id="aiModel" label="AI model (optional)" help="If AI was used to generate or edit the content, name the model." error={inputErrors.aiModel}>
+        <Field id="aiModel" label="AI model (optional)" help="If AI generated or edited this content, enter the tool or model name." error={inputErrors.aiModel}>
           <input type="text" value={values.aiModel} onChange={set("aiModel")} {...inputProps("aiModel")} />
         </Field>
       </fieldset>
@@ -493,6 +504,7 @@ export function UploadForm() {
 
       <button type="submit" disabled={submitting || hashState.status === "hashing"}>
         {submitting ? "Submitting…" : hashState.status === "hashing" ? "Hashing file…" : "Submit for verification"}
+        {!submitting && hashState.status !== "hashing" && <ShortcutHint keys="Ctrl + Enter" />}
       </button>
     </form>
   );
