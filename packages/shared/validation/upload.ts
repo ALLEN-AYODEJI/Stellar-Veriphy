@@ -1,8 +1,7 @@
 import type { UploadMetadata } from "../types";
-import { checkSha256Hex, normalizeHash } from "./hash";
+import { toValidationResult, rejectUnknownFields, sha256Field, stellarAddressField, stringListField, textField } from "./fields";
 import { validateManifest } from "./manifest";
 import { FieldError, ValidationResult, isPlainObject } from "./result";
-import { checkStellarPublicKey } from "./stellar";
 
 // MIME type -> accepted file extensions.
 export const SUPPORTED_MEDIA_TYPES: Record<string, string[]> = {
@@ -35,39 +34,12 @@ function extensionOf(fileName: string): string {
   return dot === -1 ? "" : fileName.slice(dot).toLowerCase();
 }
 
-function optionalText(
+// Checks fileName, mimeType and fileSize (the extension must match the type).
+// Shared by upload metadata and resumable upload sessions.
+export function checkFileFields(
   input: Record<string, unknown>,
-  field: string,
-  maxLength: number,
   errors: FieldError[],
-): string | undefined {
-  const value = input[field];
-  if (value === undefined || value === null) return undefined;
-  if (typeof value !== "string") {
-    errors.push({ field, message: "Must be text." });
-    return undefined;
-  }
-  const trimmed = value.trim();
-  if (trimmed.length > maxLength) {
-    errors.push({ field, message: `Must be at most ${maxLength} characters.` });
-    return undefined;
-  }
-  return trimmed || undefined;
-}
-
-// Validates upload metadata and returns it in the normalized form that is stored.
-export function validateUploadMetadata(input: unknown, options: { now?: Date } = {}): ValidationResult<UploadMetadata> {
-  if (!isPlainObject(input)) {
-    return { ok: false, errors: [{ field: "body", message: "Upload metadata must be a JSON object." }] };
-  }
-  const errors: FieldError[] = [];
-
-  for (const key of Object.keys(input)) {
-    if (!UPLOAD_FIELDS.includes(key)) {
-      errors.push({ field: key, message: `Unknown field "${key}".`, hint: `Allowed fields: ${UPLOAD_FIELDS.join(", ")}.` });
-    }
-  }
-
+): { fileName: string; mimeType: string; fileSize: number } {
   // mimeType
   let mimeType = "";
   if (typeof input.mimeType !== "string" || input.mimeType.trim() === "") {
@@ -113,43 +85,31 @@ export function validateUploadMetadata(input: unknown, options: { now?: Date } =
     errors.push({ field: "fileSize", message: `File is larger than the ${UPLOAD_LIMITS.maxFileSizeBytes / (1024 * 1024)} MB limit.` });
   }
 
-  // contentHash
-  let contentHash = "";
-  if (typeof input.contentHash !== "string") {
-    errors.push({ field: "contentHash", message: "Content hash is required." });
-  } else {
-    contentHash = normalizeHash(input.contentHash);
-    const problem = checkSha256Hex(contentHash);
-    if (problem) errors.push({ field: "contentHash", ...problem });
+  return { fileName, mimeType, fileSize: typeof fileSize === "number" ? fileSize : 0 };
+}
+
+// Validates upload metadata and returns it in the normalized form that is stored.
+export function validateUploadMetadata(input: unknown, options: { now?: Date } = {}): ValidationResult<UploadMetadata> {
+  if (!isPlainObject(input)) {
+    return { ok: false, errors: [{ field: "body", message: "Upload metadata must be a JSON object." }] };
   }
+  const errors: FieldError[] = [];
 
-  // creator
-  let creator = "";
-  if (typeof input.creator !== "string" || input.creator.trim() === "") {
-    errors.push({ field: "creator", message: "Creator public key is required." });
-  } else {
-    creator = input.creator.trim().toUpperCase();
-    const problem = checkStellarPublicKey(creator);
-    if (problem) errors.push({ field: "creator", ...problem });
-  }
+  rejectUnknownFields(input, UPLOAD_FIELDS, errors);
 
-  const title = optionalText(input, "title", UPLOAD_LIMITS.titleMaxLength, errors);
-  const description = optionalText(input, "description", UPLOAD_LIMITS.descriptionMaxLength, errors);
+  const { fileName, mimeType, fileSize } = checkFileFields(input, errors);
 
+  const contentHash = sha256Field(input, "contentHash", { required: true, requiredMessage: "Content hash is required." }, errors) ?? "";
+  const creator = stellarAddressField(input, "creator", { required: true, requiredMessage: "Creator public key is required." }, errors) ?? "";
+  const title = textField(input, "title", { maxLength: UPLOAD_LIMITS.titleMaxLength }, errors);
+  const description = textField(input, "description", { maxLength: UPLOAD_LIMITS.descriptionMaxLength }, errors);
   // tags: trimmed, lowercased, de-duplicated
-  let tags: string[] = [];
-  if (input.tags !== undefined && input.tags !== null) {
-    if (!Array.isArray(input.tags) || input.tags.some((t) => typeof t !== "string")) {
-      errors.push({ field: "tags", message: "Tags must be a list of text values." });
-    } else {
-      tags = [...new Set((input.tags as string[]).map((t) => t.trim().toLowerCase()).filter(Boolean))];
-      if (tags.length > UPLOAD_LIMITS.maxTags) {
-        errors.push({ field: "tags", message: `At most ${UPLOAD_LIMITS.maxTags} tags are allowed.` });
-      } else if (tags.some((t) => t.length > UPLOAD_LIMITS.tagMaxLength)) {
-        errors.push({ field: "tags", message: `Each tag must be at most ${UPLOAD_LIMITS.tagMaxLength} characters.` });
-      }
-    }
-  }
+  const tags = stringListField(
+    input,
+    "tags",
+    { maxItems: UPLOAD_LIMITS.maxTags, itemMaxLength: UPLOAD_LIMITS.tagMaxLength, lowercase: true, unique: true },
+    errors,
+  ) ?? [];
 
   // manifest, plus cross-field consistency with the upload itself
   const manifestResult = validateManifest(input.manifest, { now: options.now, path: "manifest" });
@@ -173,18 +133,13 @@ export function validateUploadMetadata(input: unknown, options: { now?: Date } =
     }
   }
 
-  if (errors.length > 0 || !manifestResult.ok) return { ok: false, errors };
+  if (!manifestResult.ok) return { ok: false, errors };
+  const manifest = manifestResult.value;
 
-  const value: UploadMetadata = {
-    fileName,
-    mimeType,
-    fileSize: fileSize as number,
-    contentHash,
-    creator,
-    tags,
-    manifest: manifestResult.value,
-  };
-  if (title) value.title = title;
-  if (description) value.description = description;
-  return { ok: true, value };
+  return toValidationResult(errors, () => {
+    const value: UploadMetadata = { fileName, mimeType, fileSize, contentHash, creator, tags, manifest };
+    if (title) value.title = title;
+    if (description) value.description = description;
+    return value;
+  });
 }

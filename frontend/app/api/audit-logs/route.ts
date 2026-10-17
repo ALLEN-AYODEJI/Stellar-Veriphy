@@ -1,5 +1,6 @@
-import type { ApiResponse, AuditLogEntry } from "@stellarveriphy/shared";
+import { paginate, parsePaginationParams, type ApiResponse, type AuditLogEntry } from "@stellarveriphy/shared";
 import { NextRequest, NextResponse } from "next/server";
+import { legacyValidationError } from "@/lib/server/http";
 
 function getStoredAuditLogs(): AuditLogEntry[] {
   if (typeof globalThis !== "undefined" && "auditLogs" in globalThis) {
@@ -19,12 +20,17 @@ export async function GET(
 ): Promise<NextResponse<ApiResponse<AuditLogEntry[]>>> {
   try {
     const { searchParams } = new URL(request.url);
+    const pageParams = parsePaginationParams(searchParams);
+    if (!pageParams.ok) return legacyValidationError(pageParams.errors);
     const entityId = searchParams.get("entityId");
 
     const auditLogs = getStoredAuditLogs();
     const filtered = entityId ? auditLogs.filter((log) => log.entityId === entityId) : auditLogs;
 
-    return NextResponse.json({ success: true, data: filtered });
+    // Newest first, so page 1 is the most recent activity.
+    const sorted = [...filtered].sort((a, b) => b.timestamp - a.timestamp);
+    const page = paginate(sorted, pageParams.value);
+    return NextResponse.json({ success: true, data: page.items, pagination: page.pagination });
   } catch (error) {
     return NextResponse.json(
       { success: false, error: "Failed to fetch audit logs" },

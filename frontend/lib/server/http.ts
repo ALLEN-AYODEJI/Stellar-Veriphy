@@ -1,5 +1,11 @@
 import { NextResponse } from "next/server";
-import type { FieldError } from "@stellarveriphy/shared";
+import {
+  parsePaginationParams,
+  type FieldError,
+  type PaginationMeta,
+  type PaginationParams,
+  type ValidationResult,
+} from "@stellarveriphy/shared";
 import { logOperationalEvent } from "./observability";
 
 export type ApiStatus =
@@ -12,6 +18,8 @@ export type ApiStatus =
   | "validation_error"
   | "not_found"
   | "rate_limited"
+  | "conflict"
+  | "expired"
   | "server_error";
 
 export interface ApiBody<T> {
@@ -20,6 +28,7 @@ export interface ApiBody<T> {
   errors?: FieldError[];
   data?: T;
   requestId?: string;
+  pagination?: PaginationMeta;
 }
 
 export function respond<T>(httpStatus: number, body: ApiBody<T>) {
@@ -42,6 +51,34 @@ export async function readJson(req: Request): Promise<{ body: unknown } | { resp
 }
 
 export function serverError(context: string, err: unknown, requestId?: string) {
+// The one response shape for invalid input, used by every route (422 + field errors).
+export function validationError(errors: FieldError[], message = "The request is invalid. See `errors` for details.") {
+  return respond(422, { status: "validation_error", message, errors });
+}
+
+// Parses a JSON body and runs a shared validator on it, or returns the error response to send.
+export async function readValidated<T>(
+  req: Request,
+  validate: (body: unknown) => ValidationResult<T>,
+): Promise<{ value: T } | { response: NextResponse }> {
+  const parsed = await readJson(req);
+  if ("response" in parsed) return parsed;
+  const result = validate(parsed.body);
+  if (!result.ok) return { response: validationError(result.errors) };
+  return { value: result.value };
+}
+
+// Reads page/pageSize/cursor query parameters, or returns the error response to send.
+export function readPagination(
+  req: Request,
+  options?: { defaultPageSize?: number; maxPageSize?: number },
+): { value: PaginationParams } | { response: NextResponse } {
+  const result = parsePaginationParams(new URL(req.url).searchParams, options);
+  if (!result.ok) return { response: validationError(result.errors, "Pagination parameters are invalid.") };
+  return { value: result.value };
+}
+
+export function serverError(context: string, err: unknown) {
   logOperationalEvent("error", "api.server_error", {
     requestId,
     route: context,
@@ -56,4 +93,17 @@ export function serverError(context: string, err: unknown, requestId?: string) {
       : "Something went wrong on our side. Please try again.",
     requestId,
   });
+}
+
+// Validation error in the legacy `{ success, error }` envelope used by older
+// routes. Same field errors as `validationError`, so clients can handle both.
+export function legacyValidationError(errors: FieldError[], httpStatus = 400) {
+  return NextResponse.json<{ success: false; error: string; errors: FieldError[] }>(
+    {
+      success: false,
+      error: errors.map((e) => `${e.field}: ${e.message}`).join(" "),
+      errors,
+    },
+    { status: httpStatus },
+  );
 }

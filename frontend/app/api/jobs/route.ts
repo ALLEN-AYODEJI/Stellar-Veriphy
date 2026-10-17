@@ -1,5 +1,5 @@
 import { isPlainObject, type VerificationJobView } from "@stellarveriphy/shared";
-import { readJson, respond, serverError } from "@/lib/server/http";
+import { readJson, respond, serverError, validationError } from "@/lib/server/http";
 import { enqueueJob, getJobViews } from "@/lib/server/jobs";
 import { logOperationalEvent, requestIdFrom } from "@/lib/server/observability";
 import { getUpload } from "@/lib/server/uploads";
@@ -30,10 +30,9 @@ export async function POST(req: Request) {
       status: 422,
       reason: "missing_upload_id",
     });
-    return respond(422, {
-      status: "validation_error",
-      errors: [{ field: "uploadId", message: "uploadId is required.", hint: "Register the upload with POST /api/uploads first." }],
-    });
+    return validationError([
+      { field: "uploadId", message: "uploadId is required.", hint: "Register the upload with POST /api/uploads first." },
+    ]);
   }
 
   try {
@@ -83,10 +82,7 @@ export async function GET(req: Request) {
     .map((id) => id.trim())
     .filter(Boolean);
   if (ids.length > MAX_IDS_PER_REQUEST) {
-    return respond(422, {
-      status: "validation_error",
-      errors: [{ field: "ids", message: `At most ${MAX_IDS_PER_REQUEST} job IDs can be requested at once.` }],
-    });
+    return validationError([{ field: "ids", message: `At most ${MAX_IDS_PER_REQUEST} job IDs can be requested at once.` }]);
   }
 
   try {

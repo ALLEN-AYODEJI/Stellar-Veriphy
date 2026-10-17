@@ -17,7 +17,9 @@ All responses use this envelope:
 | 201 | `created` | Upload metadata stored |
 | 202 | `queued` | Verification job queued |
 | 400 | `invalid_json` | Body is not valid JSON |
-| 404 | `not_found` | Unknown upload or job ID |
+| 404 | `not_found` | Unknown upload, job or upload session ID |
+| 409 | `conflict` | The action is not allowed in the resource's current state (upload sessions) |
+| 410 | `expired` | The upload session expired; restart it |
 | 415 | `unsupported_media_type` | `Content-Type` is not `application/json` |
 | 422 | `validation_error` | Body failed validation; see `errors` |
 | 500 | `server_error` | Unexpected failure; safe to retry |
@@ -88,7 +90,11 @@ The response `data` is the stored `UploadRecord`, which is the normalized metada
 
 ## `GET /api/uploads?contentHash=<sha256>`
 
-Returns every `UploadRecord` with that content hash (it may be an empty list).
+Returns every `UploadRecord` with that content hash (it may be an empty list), paginated with `page`/`pageSize`/`cursor` and a `pagination` object. See [pagination.md](./pagination.md).
+
+## Resumable uploads
+
+Interrupted uploads can be resumed or restarted through `/api/uploads/sessions`. See [upload-sessions.md](./upload-sessions.md). Manifest creation, validation and retrieval are covered end to end in [manifest-storage.md](./manifest-storage.md), and the shared validation layer in [validation.md](./validation.md).
 
 ## `GET /api/uploads/:id`
 

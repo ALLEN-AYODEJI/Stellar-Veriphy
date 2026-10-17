@@ -13,58 +13,31 @@
 
 import { NextRequest, NextResponse } from "next/server";
 
-import type { RegenerationRequest, RegenerationResult } from "@/services/certificateRegenerationService";
-
-// ---------------------------------------------------------------------------
-// Input validation
-// ---------------------------------------------------------------------------
-
-function isValidStellarKey(key: string): boolean {
-  return /^G[A-Z2-7]{55}$/.test(key);
-}
-
-function isValidHex64(value: string): boolean {
-  return /^[0-9a-f]{64}$/i.test(value);
-}
-
-const VALID_REASONS = new Set([
-  "metadata_updated",
-  "storage_ref_changed",
-  "attestation_refresh",
-  "creator_key_rotation",
-  "correction",
-]);
+import type { RegenerationResult } from "@/services/certificateRegenerationService";
+import { validateRegenerationRequest } from "@/lib/server/validators";
 
 // ---------------------------------------------------------------------------
 // Route handler
 // ---------------------------------------------------------------------------
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
-  let body: Partial<RegenerationRequest>;
+  let body: unknown;
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON request body" }, { status: 400 });
   }
 
-  const { certificateId, reason, newManifestHash, newStorageRef, reviewNote, requesterKey } = body;
-
-  // --- validation ---
-  if (!certificateId || typeof certificateId !== "string") {
-    return NextResponse.json({ error: "certificateId is required" }, { status: 400 });
+  // Shared validation (lib/server/validators.ts): requesterKey gets a full
+  // StrKey checksum check, hashes are normalized.
+  const validation = validateRegenerationRequest(body);
+  if (!validation.ok) {
+    return NextResponse.json(
+      { error: validation.errors.map((e) => `${e.field}: ${e.message}`).join(" "), errors: validation.errors },
+      { status: 400 },
+    );
   }
-  if (!reason || !VALID_REASONS.has(reason)) {
-    return NextResponse.json({ error: `reason must be one of: ${[...VALID_REASONS].join(", ")}` }, { status: 400 });
-  }
-  if (!requesterKey || !isValidStellarKey(requesterKey)) {
-    return NextResponse.json({ error: "requesterKey must be a valid Stellar public key" }, { status: 400 });
-  }
-  if (newManifestHash !== null && newManifestHash !== undefined && !isValidHex64(newManifestHash)) {
-    return NextResponse.json({ error: "newManifestHash must be a 64-character hex string" }, { status: 400 });
-  }
-  if (reviewNote && typeof reviewNote === "string" && reviewNote.length > 1000) {
-    return NextResponse.json({ error: "reviewNote must not exceed 1000 characters" }, { status: 400 });
-  }
+  const { certificateId, newManifestHash, newStorageRef, requesterKey } = validation.value;
 
   // ---------------------------------------------------------------------------
   // Regeneration logic

@@ -1,14 +1,18 @@
 /**
- * GET  /api/admin/moderation        — list queue items (filterable by status)
+ * GET  /api/admin/moderation        — list queue items (filterable by status; paginated)
  * POST /api/admin/moderation        — create a new moderation item
  */
-import type {
-  ApiResponse,
-  ModerationQueueItem,
-  ModerationQueueSummary,
+import {
+  paginate,
+  parsePaginationParams,
+  type ApiResponse,
+  type ModerationQueueItem,
+  type ModerationQueueSummary,
 } from "@stellarveriphy/shared";
 import { NextRequest, NextResponse } from "next/server";
+import { legacyValidationError } from "@/lib/server/http";
 import { logOperationalEvent, requestIdFrom } from "@/lib/server/observability";
+import { validateModerationItem } from "@/lib/server/validators";
 
 // ---------------------------------------------------------------------------
 // In-memory store (replaced by a DB in production)
@@ -49,6 +53,8 @@ export async function GET(
   request: NextRequest,
 ): Promise<NextResponse<ApiResponse<{ items: ModerationQueueItem[]; summary: ModerationQueueSummary }>>> {
   const { searchParams } = new URL(request.url);
+  const pageParams = parsePaginationParams(searchParams);
+  if (!pageParams.ok) return legacyValidationError(pageParams.errors);
   const status = searchParams.get("status");
   const trigger = searchParams.get("trigger");
 
@@ -62,25 +68,17 @@ export async function GET(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
   );
 
+  const page = paginate(items, pageParams.value);
   return NextResponse.json({
     success: true,
-    data: { items, summary: buildSummary(getQueue()) },
+    data: { items: page.items, summary: buildSummary(getQueue()) },
+    pagination: page.pagination,
   });
 }
 
 // ---------------------------------------------------------------------------
 // POST
 // ---------------------------------------------------------------------------
-
-interface CreateModerationItemBody {
-  assetId: string;
-  contentHash: string;
-  trigger: ModerationQueueItem["trigger"];
-  summary: string;
-  reportedBy?: string;
-  creatorAddress?: string;
-  evidence?: string[];
-}
 
 export async function POST(
   request: NextRequest,
@@ -94,13 +92,9 @@ export async function POST(
     return NextResponse.json({ success: false, error: "Malformed JSON." }, { status: 400 });
   }
 
-  const b = body as CreateModerationItemBody;
-  if (!b.assetId || !b.contentHash || !b.trigger || !b.summary) {
-    return NextResponse.json(
-      { success: false, error: "assetId, contentHash, trigger, and summary are required." },
-      { status: 400 },
-    );
-  }
+  const validation = validateModerationItem(body);
+  if (!validation.ok) return legacyValidationError(validation.errors);
+  const b = validation.value;
 
   const now = new Date().toISOString();
   const newItem: ModerationQueueItem = {
@@ -112,7 +106,7 @@ export async function POST(
     summary: b.summary,
     reportedBy: b.reportedBy,
     creatorAddress: b.creatorAddress,
-    evidence: b.evidence ?? [],
+    evidence: b.evidence,
     createdAt: now,
     updatedAt: now,
     escalationChain: [],

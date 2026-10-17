@@ -12,6 +12,10 @@
 | [Contract Error Codes](api/error-codes.md)        | Contributors, support, integrators                    | Contract-specific error enums, triggers, and first-pass remediation                                                |
 | [Request IDs](api/request-ids.md) | Support, contributors, integrators | `X-Request-Id` header, log correlation, troubleshooting a failed request |
 | [Rate Limits](api/rate-limits.md) | Frontend contributors, integrators | Per-route limits, `X-RateLimit-*` / `Retry-After` headers, 429 body format |
+| [Manifest Storage API](api/manifest-storage.md)   | Integrators, backend contributors                     | Creating, validating and retrieving manifests; request/response examples; error list; auth status                 |
+| [Upload Sessions API](api/upload-sessions.md)     | Integrators, frontend/backend contributors            | Resumable uploads: session lifecycle, progress tracking, resume and restart                                        |
+| [Pagination](api/pagination.md)                   | Contributors, integrators                             | Pagination parameters and metadata shared by collection endpoints                                                  |
+| [Server-side Validation](api/validation.md)       | Backend contributors                                  | Shared validation rules, error format, how to write a validator                                                    |
 | [Video Tutorials](tutorials/README.md)            | End users, onboarding help                            | Tutorial scripts/transcripts for recording and YouTube publishing                                                  |
 | [Architecture Decision Records](adr/README.md)    | Contributors, especially anyone touching architecture | Why the system is built the way it is                                                                               |
 | [Governance and Policy Review Framework](security/governance-framework.md) | Contributors, operators, community | Stakeholder roles, review paths, trust thresholds, emergency actions, accountability |

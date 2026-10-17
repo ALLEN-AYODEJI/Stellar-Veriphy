@@ -11,8 +11,8 @@
  * The caller must display required disclosures to the creator before
  * proceeding.  Blocked assets must not be uploaded or certified.
  */
-import { isPlainObject } from "@stellarveriphy/shared";
-import { respond, readJson, serverError } from "@/lib/server/http";
+import { enumField, integerField, requireObject, textField, type FieldError } from "@stellarveriphy/shared";
+import { respond, readJson, serverError, validationError } from "@/lib/server/http";
 import { logOperationalEvent, requestIdFrom } from "@/lib/server/observability";
 import {
   evaluatePolicy,
@@ -46,40 +46,30 @@ export async function POST(req: Request) {
   const parsed = await readJson(req);
   if ("response" in parsed) return parsed.response;
 
-  const body = parsed.body;
-  if (!isPlainObject(body)) {
-    return respond(422, { status: "validation_error", errors: [{ field: "body", message: "Expected a JSON object." }] });
-  }
+  const object = requireObject(parsed.body);
+  if (!object.ok) return validationError(object.errors);
+  const body = object.value;
 
-  // Validate required fields
-  const errors: { field: string; message: string }[] = [];
-
-  const assetClass = body.assetClass as AssetClass;
-  if (!VALID_ASSET_CLASSES.includes(assetClass)) {
-    errors.push({ field: "assetClass", message: `Must be one of: ${VALID_ASSET_CLASSES.join(", ")}.` });
-  }
-
-  const creatorSegment = body.creatorSegment as CreatorSegment;
-  if (!VALID_CREATOR_SEGMENTS.includes(creatorSegment)) {
-    errors.push({ field: "creatorSegment", message: `Must be one of: ${VALID_CREATOR_SEGMENTS.join(", ")}.` });
-  }
-
-  const jurisdiction = body.jurisdiction;
-  if (typeof jurisdiction !== "string" || jurisdiction.trim() === "") {
-    errors.push({ field: "jurisdiction", message: "jurisdiction is required (e.g. 'EU', 'US', 'GLOBAL')." });
-  }
-
-  if (errors.length > 0) {
-    return respond(422, { status: "validation_error", errors });
-  }
+  const errors: FieldError[] = [];
+  const assetClass = enumField(body, "assetClass", VALID_ASSET_CLASSES, { required: true }, errors);
+  const creatorSegment = enumField(body, "creatorSegment", VALID_CREATOR_SEGMENTS, { required: true }, errors);
+  const jurisdiction = textField(body, "jurisdiction", {
+    required: true,
+    requiredMessage: "jurisdiction is required (e.g. 'EU', 'US', 'GLOBAL').",
+    maxLength: 20,
+    singleLine: true,
+  }, errors);
+  const mimeType = textField(body, "mimeType", { maxLength: 100, singleLine: true }, errors);
+  const fileSize = integerField(body, "fileSize", { min: 0 }, errors);
+  if (errors.length > 0 || !assetClass || !creatorSegment || !jurisdiction) return validationError(errors);
 
   const context: PolicyContext = {
     assetClass,
     creatorSegment,
-    jurisdiction: (jurisdiction as string).trim().toUpperCase(),
+    jurisdiction: jurisdiction.toUpperCase(),
     aiLabel: typeof body.aiLabel === "string" ? (body.aiLabel as AiGenerationType) : undefined,
-    mimeType: typeof body.mimeType === "string" ? body.mimeType : undefined,
-    fileSize: typeof body.fileSize === "number" ? body.fileSize : undefined,
+    mimeType,
+    fileSize,
   };
 
   try {

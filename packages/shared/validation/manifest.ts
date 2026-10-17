@@ -1,7 +1,6 @@
 import type { ContentManifest } from "../types";
-import { checkSha256Hex, normalizeHash } from "./hash";
+import { rejectUnknownFields, sha256Field, stellarAddressField } from "./fields";
 import { FieldError, ValidationResult, isPlainObject } from "./result";
-import { checkStellarPublicKey } from "./stellar";
 
 export const MANIFEST_LIMITS = {
   metadataFieldMaxLength: 200,
@@ -49,35 +48,20 @@ export function validateManifest(
     };
   }
 
-  for (const key of Object.keys(input)) {
-    if (!(MANIFEST_FIELDS as readonly string[]).includes(key)) {
-      errors.push({ field: at(key), message: `Unknown manifest field "${key}".`, hint: `Allowed fields: ${MANIFEST_FIELDS.join(", ")}.` });
-    }
-  }
+  rejectUnknownFields(input, MANIFEST_FIELDS, errors, options.path);
 
-  // contentHash
-  let contentHash = "";
-  if (input.contentHash === undefined || input.contentHash === "") {
-    errors.push({ field: at("contentHash"), message: "Content hash is required.", hint: "Select a file so its SHA-256 hash can be computed." });
-  } else if (typeof input.contentHash !== "string") {
-    errors.push({ field: at("contentHash"), message: "Content hash must be a string." });
-  } else {
-    contentHash = normalizeHash(input.contentHash);
-    const problem = checkSha256Hex(contentHash);
-    if (problem) errors.push({ field: at("contentHash"), ...problem });
-  }
-
-  // creator
-  let creator = "";
-  if (input.creator === undefined || input.creator === "") {
-    errors.push({ field: at("creator"), message: "Creator public key is required.", hint: "Enter the Stellar address (G…) that will own this content." });
-  } else if (typeof input.creator !== "string") {
-    errors.push({ field: at("creator"), message: "Creator must be a string." });
-  } else {
-    creator = input.creator.trim().toUpperCase();
-    const problem = checkStellarPublicKey(creator);
-    if (problem) errors.push({ field: at("creator"), ...problem });
-  }
+  const contentHash = sha256Field(input, "contentHash", {
+    path: options.path,
+    required: true,
+    requiredMessage: "Content hash is required.",
+    requiredHint: "Select a file so its SHA-256 hash can be computed.",
+  }, errors) ?? "";
+  const creator = stellarAddressField(input, "creator", {
+    path: options.path,
+    required: true,
+    requiredMessage: "Creator public key is required.",
+    requiredHint: "Enter the Stellar address (G…) that will own this content.",
+  }, errors) ?? "";
 
   // timestamp
   let timestamp = "";
