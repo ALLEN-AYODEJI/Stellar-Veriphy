@@ -95,7 +95,7 @@ export function AssetStatusFilterChips({
 }: AssetStatusFilterChipsProps) {
   return (
     <nav
-      className={`flex items-center gap-2 overflow-x-auto py-2 no-scrollbar ${className}`}
+      className={`flex flex-wrap items-center gap-2 py-2 ${className}`}
       aria-label={ariaLabel}
       role="tablist"
     >
@@ -111,7 +111,7 @@ export function AssetStatusFilterChips({
             aria-selected={isActive}
             aria-controls={`panel-${opt.key}`}
             onClick={() => onSelectStatus(opt.key)}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 cursor-pointer ${
+            className={`inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border px-3 py-2 text-sm font-medium leading-5 transition-colors whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 cursor-pointer ${
               isActive
                 ? opt.activeClass
                 : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
@@ -119,6 +119,7 @@ export function AssetStatusFilterChips({
             data-testid={`filter-chip-${opt.key}`}
             data-active={isActive ? "true" : "false"}
           >
+            {isActive && <span aria-hidden="true">✓</span>}
             <span>{opt.label}</span>
             {count !== undefined && (
               <span

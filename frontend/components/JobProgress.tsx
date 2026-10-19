@@ -5,8 +5,8 @@ import type { VerificationJobView, VerificationStatus } from "@stellarveriphy/sh
 export const STATUS_COPY: Record<VerificationStatus, { label: string; description: string; next: string }> = {
   pending: {
     label: "Queued",
-    description: "Your submission is waiting for a verifier to pick it up.",
-    next: "It will start automatically. You can leave this page; progress is saved.",
+    description: "Your submission is waiting for an independent verification service to pick it up.",
+    next: "Review starts automatically. You can leave this page; your progress is saved.",
   },
   processing: {
     label: "Running",

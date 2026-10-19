@@ -241,25 +241,33 @@ export default async function ShareableVerificationPage({
 
           {/* Timeline */}
           <Section title="Verification History & Timeline">
-            <ol className="relative border-l border-slate-200 pl-4 space-y-4 dark:border-gray-800">
-              {timeline.map((evt, idx) => (
-                <li key={idx} className="relative">
-                  <div className="absolute -left-[21px] top-1.5 h-2.5 w-2.5 rounded-full bg-indigo-600 ring-4 ring-white dark:ring-gray-900" />
-                  <div className="text-xs text-slate-500">{formatDate(evt.timestamp)}</div>
-                  <div className="text-sm font-semibold dark:text-white">
-                    {EVENT_LABELS[evt.type] ?? evt.type}
-                  </div>
-                  {evt.detail && (
-                    <div className="text-xs text-slate-600 dark:text-gray-400 mt-0.5">{evt.detail}</div>
-                  )}
-                  {evt.txHash && (
-                    <div className="text-xs font-mono text-slate-400 mt-0.5 break-all">
-                      Tx: {evt.txHash}
+            {timeline.length > 0 ? (
+              <ol className="relative border-l border-slate-200 pl-4 space-y-4 dark:border-gray-800">
+                {timeline.map((evt, idx) => (
+                  <li key={idx} className="relative">
+                    <div className="absolute -left-[21px] top-1.5 h-2.5 w-2.5 rounded-full bg-indigo-600 ring-4 ring-white dark:ring-gray-900" />
+                    <div className="text-xs text-slate-500">{formatDate(evt.timestamp)}</div>
+                    <div className="text-sm font-semibold dark:text-white">
+                      {EVENT_LABELS[evt.type] ?? evt.type}
                     </div>
-                  )}
-                </li>
-              ))}
-            </ol>
+                    {evt.detail && (
+                      <div className="text-xs text-slate-600 dark:text-gray-400 mt-0.5">{evt.detail}</div>
+                    )}
+                    {evt.txHash && (
+                      <div className="text-xs font-mono text-slate-400 mt-0.5 break-all">
+                        Tx: {evt.txHash}
+                      </div>
+                    )}
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <p className="text-sm text-slate-500 dark:text-gray-400">
+                {record.status === "pending"
+                  ? "Review updates will appear here after the independent verification service starts."
+                  : "No review history is available yet."}
+              </p>
+            )}
           </Section>
         </div>
 
