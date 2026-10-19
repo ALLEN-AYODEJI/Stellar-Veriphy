@@ -10,6 +10,7 @@ import {
   type VerificationSessionDoc,
   type VerificationStatus,
 } from "../db/collections.js";
+import { assertRetentionDeletable } from "./protection.js";
 
 export type RetentionPolicy = Config["retention"];
 
@@ -43,6 +44,7 @@ const DAY_MS = 24 * HOUR_MS;
  *
  * Never touched: the verifications collection (user-facing records and certificates), sessions in
  * the "submitted" state, and any session whose linked verification is still pending/processing.
+ * The first is enforced in code: every delete checks RETENTION_DELETABLE_COLLECTIONS (protection.ts).
  * Sessions are archived (copied, then deleted) rather than deleted outright, and archives are only
  * purged after RETENTION_ARCHIVE_DAYS.
  */
@@ -135,6 +137,9 @@ export class RetentionCleaner {
     reason: ArchivedSessionDoc["archiveReason"],
     dryRun: boolean,
   ): Promise<TaskResult> {
+    assertRetentionDeletable(Collections.sessions);
+    assertRetentionDeletable(Collections.sessionsArchive);
+
     const sessions = this.db.collection<VerificationSessionDoc>(Collections.sessions);
     const archive = this.db.collection<ArchivedSessionDoc>(Collections.sessionsArchive);
     const verifications = this.db.collection<VerificationDoc>(Collections.verifications);
@@ -207,6 +212,7 @@ export class RetentionCleaner {
 
   /** Batched delete by _id so large purges never hold one long-running operation. */
   private async purge(collection: string, filter: Filter<Record<string, unknown>>, dryRun: boolean): Promise<TaskResult> {
+    assertRetentionDeletable(collection);
     const col = this.db.collection(collection);
     if (dryRun) {
       return { matched: await col.countDocuments(filter), archived: 0, deleted: 0, skippedActive: 0, truncated: false };

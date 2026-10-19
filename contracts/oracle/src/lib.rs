@@ -2347,5 +2347,6 @@ mod test;
 #[cfg(test)]
 mod integration_tests;
 
+// #807 — repeatable cost benchmark for the most-used calls. Run via scripts/benchmark-contracts.mjs.
 #[cfg(test)]
-mod smoke_tests;
+mod benchmark;

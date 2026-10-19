@@ -16,7 +16,7 @@ Verification sessions and job records are temporary working state. A scheduled c
 
 ## What cleanup never removes
 
-- **`verifications`**: verification records and certificate references are user data and the product's audit trail. No retention rule touches this collection.
+- **`verifications`**: verification records and certificate references are user data and the product's audit trail. No retention rule touches this collection, and the cleanup code refuses to delete from any collection not on its allow-list (see [backup-retention.md](backup-retention.md#2-protection-from-accidental-deletion-enforced-in-code)).
 - **Sessions in state `submitted`**: their verification is in flight.
 - **Any session whose linked verification is `pending` or `processing`**, whatever the session's own state. These are counted as `skippedActive` in the report.
 - **Queued or running jobs**: only `succeeded` and `dead` jobs are purged.
