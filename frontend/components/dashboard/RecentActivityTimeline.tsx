@@ -1,15 +1,25 @@
 "use client";
 
+import type { ProvenanceEvent } from "@stellarveriphy/shared/types";
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import type { ProvenanceEvent } from "@stellarveriphy/shared/types";
+
+import {
+  ACTIVITY_SORT_LABELS,
+  ACTIVITY_TIME_RANGES,
+  type ActivitySort,
+  type ActivityTimeRange,
+  type ActivityTypeFilter,
+  selectActivity,
+} from "@/lib/provenance/activity";
 import {
   EVENT_CATEGORY,
   EVENT_LABELS,
+  type EventCategory,
   relativeTime,
   shortKey,
-  type EventCategory,
 } from "@/lib/provenance/data";
+
 import { DashboardEmptyState } from "./DashboardEmptyState";
 
 const CATEGORY_STYLE: Record<EventCategory, string> = {
@@ -18,7 +28,7 @@ const CATEGORY_STYLE: Record<EventCategory, string> = {
   update: "bg-violet-500",
 };
 
-const FILTERS: { key: EventCategory | "all"; label: string }[] = [
+const FILTERS: { key: ActivityTypeFilter; label: string }[] = [
   { key: "all", label: "All" },
   { key: "verification", label: "Verifications" },
   { key: "certificate", label: "Certificates" },
@@ -40,25 +50,60 @@ interface RecentActivityTimelineProps {
 }
 
 export function RecentActivityTimeline({ events, limit = 30 }: RecentActivityTimelineProps) {
-  const [filter, setFilter] = useState<EventCategory | "all">("all");
+  const [filter, setFilter] = useState<ActivityTypeFilter>("all");
+  const [range, setRange] = useState<ActivityTimeRange>("all");
+  const [sort, setSort] = useState<ActivitySort>("newest");
 
   const groups = useMemo(() => {
-    const filtered = events
-      .filter((e) => filter === "all" || EVENT_CATEGORY[e.type] === filter)
-      .sort((a, b) => b.timestamp - a.timestamp)
-      .slice(0, limit);
+    const selected = selectActivity(events, {
+      category: filter,
+      range,
+      sort,
+      limit,
+      now: Math.floor(Date.now() / 1000),
+    });
     const map = new Map<string, ProvenanceEvent[]>();
-    for (const e of filtered) {
+    for (const e of selected) {
       const k = dayLabel(e.timestamp);
       map.set(k, [...(map.get(k) ?? []), e]);
     }
     return [...map.entries()];
-  }, [events, filter, limit]);
+  }, [events, filter, range, sort, limit]);
+
+  const filtersApplied = filter !== "all" || range !== "all";
+  const showAll = () => {
+    setFilter("all");
+    setRange("all");
+  };
 
   return (
     <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Recent activity</h2>
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="sr-only" htmlFor="activity-range">Time range</label>
+          <select
+            id="activity-range"
+            value={range}
+            onChange={(e) => setRange(e.target.value as ActivityTimeRange)}
+            className="rounded-md border border-gray-300 bg-white px-2 py-1 text-xs text-gray-900 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
+          >
+            {ACTIVITY_TIME_RANGES.map((r) => (
+              <option key={r.key} value={r.key}>{r.label}</option>
+            ))}
+          </select>
+          <label className="sr-only" htmlFor="activity-sort">Sort order</label>
+          <select
+            id="activity-sort"
+            value={sort}
+            onChange={(e) => setSort(e.target.value as ActivitySort)}
+            className="rounded-md border border-gray-300 bg-white px-2 py-1 text-xs text-gray-900 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
+          >
+            {(Object.keys(ACTIVITY_SORT_LABELS) as ActivitySort[]).map((s) => (
+              <option key={s} value={s}>{ACTIVITY_SORT_LABELS[s]}</option>
+            ))}
+          </select>
+        </div>
         <div role="tablist" aria-label="Filter activity" className="flex flex-wrap gap-1">
           {FILTERS.map((f) => (
             <button
@@ -89,10 +134,10 @@ export function RecentActivityTimeline({ events, limit = 30 }: RecentActivityTim
             />
           ) : (
             <DashboardEmptyState
-              heading={`No ${FILTERS.find((item) => item.key === filter)?.label.toLowerCase()} activity yet`}
-              body="This filter has no matching events. Choose All or try another filter to see the available activity."
+              heading={filtersApplied ? "No matching activity" : "No activity yet"}
+              body="No events match the selected type and time range. Show all activity to see every event."
               actionLabel="Show all activity"
-              onAction={() => setFilter("all")}
+              onAction={showAll}
             />
           )}
         </div>
