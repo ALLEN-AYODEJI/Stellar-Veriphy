@@ -29,8 +29,10 @@
 import { create } from "zustand";
 import { subscribeWithSelector } from "zustand/middleware";
 
+import { CONTRACT_ADDRESSES } from "@/config/network";
 import { APP_NETWORK_PASSPHRASE, networkLabel } from "@/lib/network/chainCompatibility";
 import { auditLogger } from "@/lib/security/auditLogger";
+import { checkSignerCompatibility, checkTransactionTarget } from "@/lib/wallet/signerCompatibility";
 import { safeIsWalletAvailable } from "@/lib/walletDetection";
 import {
   ALL_ADAPTERS,
@@ -302,20 +304,56 @@ export const useWalletStore = create<WalletStore>()(
       // ── signTx ────────────────────────────────────────────────────────────
 
       signTx: async (xdr: string): Promise<string> => {
-        const { adapter, publicKey, network } = get();
+        const { adapter, publicKey } = get();
         if (!adapter || !publicKey) throw new Error("Wallet not connected");
+
+        // Read the wallet's current account and network rather than the polled
+        // copy, so a switch made since the last poll is caught before signing.
+        const walletAddress = await adapter.getAddress().catch(() => null);
+        const liveNetwork = await adapter.getNetwork().catch(() => null);
+        const issues = [
+          ...checkSignerCompatibility({
+            connectedAddress: publicKey,
+            walletAddress,
+            network: liveNetwork,
+            walletName: adapter.name,
+            feature: "transaction-signing",
+            appPassphrase: APP_NETWORK_PASSPHRASE,
+          }),
+        ];
+        if (liveNetwork) {
+          issues.push(
+            ...checkTransactionTarget({
+              xdr,
+              networkPassphrase: liveNetwork.networkPassphrase,
+              allowedContractIds: Object.values(CONTRACT_ADDRESSES),
+            })
+          );
+        }
+        if (issues.length > 0 || !liveNetwork) {
+          void auditLogger.logEvent({
+            actor: publicKey,
+            category: "contract",
+            action: "signer compatibility check failed",
+            severity: "warning",
+            details: `${adapter.name}: ${issues.map((issue) => issue.code).join(", ")}`,
+          });
+          throw new Error(issues.map((issue) => issue.message).join(" "));
+        }
+
+        set({ network: liveNetwork });
 
         try {
           const signed = await adapter.signTransaction(
             xdr,
-            network?.networkPassphrase ?? "",
+            liveNetwork.networkPassphrase,
             publicKey
           );
           void auditLogger.logEvent({
             actor: publicKey,
             category: "contract",
             action: "transaction signed",
-            details: `Network: ${network?.network ?? "unknown"}`,
+            details: `Network: ${liveNetwork.network}`,
           });
           return signed;
         } catch (e) {
