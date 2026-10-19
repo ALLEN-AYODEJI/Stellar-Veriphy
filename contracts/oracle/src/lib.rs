@@ -1,3 +1,5 @@
+#![no_std]
+
 //! # StellarVeriphy — Oracle Contract
 //!
 //! Manages **verification request lifecycles** and oracle provider

@@ -1,3 +1,5 @@
+#![no_std]
+
 //! # StellarVeriphy — Registry Contract
 //!
 //! Maintains the on-chain registry of:
@@ -39,7 +41,6 @@
 //! assert!(approved);
 //! ```
 
-#![no_std]
 use soroban_sdk::{
     contract, contracterror, contractimpl, contracttype, symbol_short, Address, Bytes, BytesN, Env,
     String, Symbol, Vec,
@@ -511,7 +512,9 @@ impl RegistryContract {
         };
         env.storage()
             .persistent()
-            .set(&DataKey::TeeHashInfo(code_hash), &record);
+            .set(&DataKey::TeeHashInfo(code_hash.clone()), &record);
+        env.events()
+            .publish((Symbol::new(env, "tee_hash_added"),), code_hash);
     }
 
     /// Check whether a TEE code hash is approved, not rotated and not expired.  #22 #23 #191
@@ -3189,6 +3192,5 @@ mod tests {
 // event emission, and error paths across the registry contract.
 #[cfg(test)]
 mod integration_tests;
-
 #[cfg(test)]
-mod revert_tests;
+mod smoke_tests;

@@ -2692,3 +2692,6 @@ impl ProvenanceContract {
             .unwrap_or(0)
     }
 }
+
+#[cfg(test)]
+mod smoke_tests;
