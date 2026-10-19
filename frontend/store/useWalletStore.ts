@@ -29,6 +29,7 @@
 import { create } from "zustand";
 import { subscribeWithSelector } from "zustand/middleware";
 
+import { APP_NETWORK_PASSPHRASE, networkLabel } from "@/lib/network/chainCompatibility";
 import { auditLogger } from "@/lib/security/auditLogger";
 import { safeIsWalletAvailable } from "@/lib/walletDetection";
 import {
@@ -84,21 +85,11 @@ function friendlyConnectError(e: unknown, walletName: string): string {
   return raw || `Couldn't connect to ${walletName}. Please try again.`;
 }
 
-/** App's expected network, from the same env var the adapters already fall back to. */
-const EXPECTED_NETWORK_PASSPHRASE = process.env.NEXT_PUBLIC_NETWORK_PASSPHRASE;
-
-function networkLabel(passphrase: string): string {
-  return passphrase.includes("Public Global") ? "Mainnet" : "Testnet";
-}
-
 /** Returns a human-readable mismatch message, or null when the network matches (or nothing is configured to compare against). */
-function networkMismatchError(
-  details: WalletNetworkDetails,
-  walletName: string
-): string | null {
-  if (!EXPECTED_NETWORK_PASSPHRASE) return null;
-  if (details.networkPassphrase === EXPECTED_NETWORK_PASSPHRASE) return null;
-  return `${walletName} is connected to ${networkLabel(details.networkPassphrase)}, but this app expects ${networkLabel(EXPECTED_NETWORK_PASSPHRASE)}. Switch ${walletName}'s network, then reconnect.`;
+function networkMismatchError(details: WalletNetworkDetails, walletName: string): string | null {
+  if (!APP_NETWORK_PASSPHRASE) return null;
+  if (details.networkPassphrase === APP_NETWORK_PASSPHRASE) return null;
+  return `${walletName} is connected to ${networkLabel(details.networkPassphrase)}, but this app expects ${networkLabel(APP_NETWORK_PASSPHRASE)}. Switch ${walletName}'s network, then reconnect.`;
 }
 
 // ---------------------------------------------------------------------------

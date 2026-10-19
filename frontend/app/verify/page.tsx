@@ -95,7 +95,9 @@ function VerifyPageContent() {
       setContentHash(hash);
       setStepComplete(1, true);
     } catch {
-      setMediaError("The file could not be read to calculate its SHA-256 hash. Try selecting it again.");
+      setMediaError(
+        "The file could not be read to calculate its SHA-256 hash. Try selecting it again."
+      );
     } finally {
       setIsHashing(false);
     }
@@ -181,10 +183,26 @@ function VerifyPageContent() {
               onChange={(event) => void handleMediaSelect(event.currentTarget.files?.[0])}
               className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 dark:file:bg-gray-700 dark:file:text-blue-400"
             />
-            {fileInfo && <p className="text-sm text-gray-600 dark:text-gray-300">Selected: {fileInfo.name} ({fileInfo.size.toLocaleString()} bytes)</p>}
-            {isHashing && <p role="status" className="text-sm text-blue-700 dark:text-blue-300">Calculating SHA-256… {Math.round(hashProgress)}%</p>}
-            {contentHash && <p className="break-all font-mono text-xs text-gray-600 dark:text-gray-300">SHA-256: {contentHash}</p>}
-            {mediaError && <p role="alert" className="text-sm text-red-700 dark:text-red-300">{mediaError}</p>}
+            {fileInfo && (
+              <p className="text-sm text-gray-600 dark:text-gray-300">
+                Selected: {fileInfo.name} ({fileInfo.size.toLocaleString()} bytes)
+              </p>
+            )}
+            {isHashing && (
+              <p role="status" className="text-sm text-blue-700 dark:text-blue-300">
+                Calculating SHA-256… {Math.round(hashProgress)}%
+              </p>
+            )}
+            {contentHash && (
+              <p className="break-all font-mono text-xs text-gray-600 dark:text-gray-300">
+                SHA-256: {contentHash}
+              </p>
+            )}
+            {mediaError && (
+              <p role="alert" className="text-sm text-red-700 dark:text-red-300">
+                {mediaError}
+              </p>
+            )}
           </div>
         );
       case 2:
@@ -199,10 +217,26 @@ function VerifyPageContent() {
               onChange={(event) => void handleManifestSelect(event.currentTarget.files?.[0])}
               className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 dark:file:bg-gray-700 dark:file:text-blue-400"
             />
-            {manifest && <p className="text-sm text-emerald-700 dark:text-emerald-300">Manifest parsed and ready.</p>}
-            {manifestHash && <p className="break-all font-mono text-xs text-gray-600 dark:text-gray-300">SHA-256: {manifestHash}</p>}
-            {isHashing && currentStep === 2 && <p role="status" className="text-sm text-blue-700 dark:text-blue-300">Reading and hashing manifest… {Math.round(hashProgress)}%</p>}
-            {manifestError && <p role="alert" className="text-sm text-red-700 dark:text-red-300">{manifestError}</p>}
+            {manifest && (
+              <p className="text-sm text-emerald-700 dark:text-emerald-300">
+                Manifest parsed and ready.
+              </p>
+            )}
+            {manifestHash && (
+              <p className="break-all font-mono text-xs text-gray-600 dark:text-gray-300">
+                SHA-256: {manifestHash}
+              </p>
+            )}
+            {isHashing && currentStep === 2 && (
+              <p role="status" className="text-sm text-blue-700 dark:text-blue-300">
+                Reading and hashing manifest… {Math.round(hashProgress)}%
+              </p>
+            )}
+            {manifestError && (
+              <p role="alert" className="text-sm text-red-700 dark:text-red-300">
+                {manifestError}
+              </p>
+            )}
           </div>
         );
       case 3:
@@ -216,7 +250,9 @@ function VerifyPageContent() {
                 onChange={(e) => setEncryptionEnabled(e.target.checked)}
                 className="w-4 h-4 rounded"
               />
-              <span className="text-gray-700 dark:text-gray-300">Encrypt the verification request (optional)</span>
+              <span className="text-gray-700 dark:text-gray-300">
+                Encrypt the verification request (optional)
+              </span>
             </label>
           </div>
         );
@@ -224,18 +260,29 @@ function VerifyPageContent() {
         return (
           <div className="space-y-4">
             <p className="text-gray-700 dark:text-gray-300">
-              Your files are ready. Review the captured hashes, then submit the verification request.
+              Your files are ready. Review the captured hashes, then submit the verification
+              request.
             </p>
             <div className="space-y-3 rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-800 dark:bg-blue-950">
               <div>
-                <p className="text-xs font-medium text-gray-600 dark:text-gray-300">Content SHA-256</p>
-                <p className="break-all font-mono text-sm text-gray-900 dark:text-white">{contentHash}</p>
+                <p className="text-xs font-medium text-gray-600 dark:text-gray-300">
+                  Content SHA-256
+                </p>
+                <p className="break-all font-mono text-sm text-gray-900 dark:text-white">
+                  {contentHash}
+                </p>
               </div>
               <div>
-                <p className="text-xs font-medium text-gray-600 dark:text-gray-300">Manifest SHA-256</p>
-                <p className="break-all font-mono text-sm text-gray-900 dark:text-white">{manifestHash}</p>
+                <p className="text-xs font-medium text-gray-600 dark:text-gray-300">
+                  Manifest SHA-256
+                </p>
+                <p className="break-all font-mono text-sm text-gray-900 dark:text-white">
+                  {manifestHash}
+                </p>
               </div>
-              <p className="text-sm text-blue-900 dark:text-blue-200">Ready to submit; verification results will be available after processing.</p>
+              <p className="text-sm text-blue-900 dark:text-blue-200">
+                Ready to submit; verification results will be available after processing.
+              </p>
             </div>
           </div>
         );
@@ -250,6 +297,7 @@ function VerifyPageContent() {
       description={config.description}
       onSubmit={handleSubmit}
       isLoading={isSubmitting}
+      chainFeature="verification-submission"
     >
       <div className="space-y-6">
         {renderStepContent()}
