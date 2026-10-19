@@ -11,7 +11,7 @@ import {
 } from "../lib/metrics.js";
 import { backoffDelay } from "../lib/retry.js";
 import { Collections, QUEUE_NAMES, type JobDoc, type JobErrorEntry, type QueueName } from "../db/collections.js";
-import { errorCode, errorMessage, isRetryable } from "./errors.js";
+import { describeError, errorCode, errorMessage, isRetryable } from "./errors.js";
 
 const ERROR_HISTORY_LIMIT = 10;
 const STALL_RECOVERY_BATCH = 100;
@@ -173,7 +173,7 @@ export class JobQueue {
       { _id: job._id, status: "running", lockedBy: workerId },
       this.failureUpdate(entry, dead, retryDelayMs, now),
     );
-    const fields = this.jobFields(job, { workerId, errorCode: entry.code, error: entry.message, durationMs: entry.durationMs });
+    const fields = this.jobFields(job, { workerId, ...describeError(err), durationMs: entry.durationMs });
     if (res.matchedCount === 0) {
       this.log.warn("job failed after its lock was lost; failure not recorded", fields);
       return "lost";
@@ -233,6 +233,9 @@ export class JobQueue {
       jobsFinished.inc({ queue: job.queue, type: job.type, outcome });
       this.log.warn(dead ? "stalled job moved to dead-letter" : "stalled job requeued", {
         ...this.jobFields(job),
+        errorCode: "STALLED",
+        error: "worker stopped heartbeating; job lock expired",
+        retryable: true,
         lockedBy: job.lockedBy,
         lastHeartbeatAt: job.heartbeatAt,
         stalledCount: job.stalledCount + 1,

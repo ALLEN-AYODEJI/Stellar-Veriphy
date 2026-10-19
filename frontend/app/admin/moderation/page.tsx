@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
+
 import { ModerationQueue } from "@/components/admin/ModerationQueue";
+import { t } from "@/lib/i18n";
 
 export const metadata: Metadata = {
-  title: "Moderation Queue — StellarVeriphy Admin",
-  description:
-    "Review disputed assets, flagged provenance records, and suspicious attestations.",
+  title: t("admin.moderation.metadata.title"),
+  description: t("admin.moderation.metadata.description"),
 };
 
 export default function AdminModerationPage() {
@@ -13,11 +14,10 @@ export default function AdminModerationPage() {
       <div className="max-w-5xl mx-auto space-y-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-50">
-            Moderation Queue
+            {t("admin.moderation.title")}
           </h1>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            Review disputed assets, flagged provenance records, and suspicious attestations.
-            Every status transition is recorded for auditability.
+            {t("admin.moderation.description")}
           </p>
         </div>
         <ModerationQueue />
