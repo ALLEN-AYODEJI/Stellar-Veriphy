@@ -5,12 +5,10 @@
 # Pre-upgrade safety validation for StellarVeriphy Soroban contracts.
 #
 # Usage:
-#   ./scripts/upgrade-safety-check.sh <contract> <old_wasm> <new_wasm> [network]
+#   ./scripts/upgrade-safety-check.sh <contract> <old_wasm> <new_wasm> [network] [--confirm]
 #
-# Arguments:
-#   contract   — one of: oracle | provenance | registry
-#   old_wasm   — path to the currently-deployed WASM (or "-" to skip compat check)
-#   new_wasm   — path to the candidate WASM you want to deploy
+#   old_wasm   — path to the currently-deployed WASM, or "-" to skip the compatibility check
+#   new_wasm   — path to the candidate WASM
 #   network    — testnet | mainnet (default: testnet)
 #
 # Exit codes:
@@ -18,20 +16,35 @@
 #   1  — one or more checks failed; do NOT deploy until resolved
 #   2  — usage error
 #
+# The source is compared with the baselines written by snapshot-contract-state.sh
+# (docs/operations/{storage-keys,struct-snapshot,api}-<contract>.txt). Each change
+# that could break existing data or existing callers is flagged as RISK:
+#   - a removed DataKey variant (stored data under it becomes unreachable)
+#   - a removed or changed persisted struct field, or a non-Option field added
+#   - a removed public entry point (existing clients fail)
+# Every RISK must be named in the migration doc, and a migration doc is required
+# whenever RISK is present, on both networks.
+#
 # What it checks:
-#   1. WASM file existence and non-zero size
-#   2. Storage key compatibility (DataKey enum diff between old and new source)
-#   3. Struct field changes that may break persistent storage reads
-#   4. Presence of a migration sequence doc for breaking changes
-#   5. Rollback feasibility (contract ID logged, consumers recorded)
-#   6. Admin / initialise guard present in new contract source
-#   7. Network-specific safety gate (mainnet requires an explicit --confirm flag)
+#   1. WASM file existence and size
+#   2. Storage keys: baseline present; removed DataKey variants are RISK
+#   3. Persisted struct fields: baseline present; removed, changed and added fields are RISK
+#   4. Entry points: baseline present; removed public functions are RISK
+#   5. Migration doc: required on mainnet and whenever RISK is found; sections present;
+#      every RISK named in it
+#   6. Rollback feasibility (deployment log and rollback procedure)
+#   7. Admin / initialise guard present in new contract source
+#   8. Network-specific safety gate (mainnet requires --confirm)
 # =============================================================================
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=contract-surface.sh
+source "$SCRIPT_DIR/contract-surface.sh"
+
 # ---------------------------------------------------------------------------
-# Colours
+# Output helpers
 # ---------------------------------------------------------------------------
 RED='\033[0;31m'; YELLOW='\033[1;33m'; GREEN='\033[0;32m'; NC='\033[0m'
 
@@ -41,6 +54,13 @@ fail()  { echo -e "${RED}[FAIL]${NC}  $*"; FAILED=$((FAILED+1)); }
 info()  { echo -e "       $*"; }
 
 FAILED=0
+# Tokens for each risky change, e.g. "DataKey::Old", "ProviderInfo.field", "fn old_entry".
+RISK_TOKENS=()
+risk() {
+  local token="$1" message="$2"
+  RISK_TOKENS+=("$token")
+  warn "RISK  $message  [$token]"
+}
 
 # ---------------------------------------------------------------------------
 # Args
@@ -56,15 +76,17 @@ NEW_WASM="$3"
 NETWORK="${4:-testnet}"
 CONFIRM="${5:-}"
 
-VALID_CONTRACTS="oracle provenance registry"
-if ! echo "$VALID_CONTRACTS" | grep -qw "$CONTRACT"; then
-  echo "Unknown contract '$CONTRACT'. Must be one of: $VALID_CONTRACTS"
-  exit 2
-fi
+case "$CONTRACT" in
+  oracle|provenance|registry) ;;
+  *) echo "Unknown contract '$CONTRACT'. Must be one of: oracle provenance registry"; exit 2 ;;
+esac
 
 CONTRACT_SRC="contracts/${CONTRACT}/src/lib.rs"
 MIGRATION_DOC="docs/operations/migration-${CONTRACT}.md"
 DEPLOYMENT_LOG="docs/operations/deployment-log.md"
+KEYS_BASELINE="docs/operations/storage-keys-${CONTRACT}.txt"
+STRUCT_BASELINE="docs/operations/struct-snapshot-${CONTRACT}.txt"
+API_BASELINE="docs/operations/api-${CONTRACT}.txt"
 
 echo ""
 echo "================================================================"
@@ -96,135 +118,154 @@ if [[ "$OLD_WASM" != "-" ]]; then
   if [[ ! -f "$OLD_WASM" ]]; then
     fail "Old WASM not found at: $OLD_WASM (pass \"-\" to skip compatibility check)"
   else
-    OLD_SIZE=$(wc -c < "$OLD_WASM")
-    pass "Old WASM found ($OLD_SIZE bytes)"
+    pass "Old WASM found ($(wc -c < "$OLD_WASM") bytes)"
   fi
 fi
 
 # ---------------------------------------------------------------------------
-# Check 2 — Storage key compatibility
+# Check 2 — Storage keys
 # ---------------------------------------------------------------------------
 echo ""
 echo "--- Check 2: Storage key compatibility (DataKey diff) ---"
 
 if [[ ! -f "$CONTRACT_SRC" ]]; then
-  warn "Contract source not found at $CONTRACT_SRC — skipping DataKey diff"
+  fail "Contract source not found at $CONTRACT_SRC"
+elif [[ ! -f "$KEYS_BASELINE" ]]; then
+  fail "No storage key baseline at $KEYS_BASELINE — storage compatibility cannot be verified"
+  info "Check out the currently-deployed version, then run: ./scripts/snapshot-contract-state.sh $CONTRACT"
 else
-  # Extract DataKey variants from source (handles both old-style and new typed keys)
-  DATAKEY_VARIANTS=$(grep -oP '(?<=DataKey::)\w+' "$CONTRACT_SRC" | sort -u)
-  DATAKEY_COUNT=$(echo "$DATAKEY_VARIANTS" | wc -l)
+  CURRENT_KEYS=$(surface_datakeys "$CONTRACT_SRC")
+  pass "Found $(grep -c . <<<"$CURRENT_KEYS" || true) DataKey variants in $CONTRACT source"
 
-  pass "Found $DATAKEY_COUNT distinct DataKey variants in $CONTRACT source"
-
-  # Check for variants that have been REMOVED compared to what the old WASM
-  # exports (we approximate by checking if the source still contains all
-  # known variant names from a reference list, if one exists)
-  COMPAT_REFERENCE="docs/operations/storage-keys-${CONTRACT}.txt"
-  if [[ -f "$COMPAT_REFERENCE" ]]; then
-    REMOVED=()
-    while IFS= read -r key; do
-      if ! echo "$DATAKEY_VARIANTS" | grep -qx "$key"; then
-        REMOVED+=("$key")
-      fi
-    done < "$COMPAT_REFERENCE"
-
-    if [[ ${#REMOVED[@]} -gt 0 ]]; then
-      fail "The following storage keys from the previous version are MISSING in the new source:"
-      for k in "${REMOVED[@]}"; do
-        info "  - DataKey::$k"
-      done
-      info "Removing a key breaks persistent storage reads for any data written under it."
-      info "Document a migration plan in $MIGRATION_DOC before proceeding."
-    else
-      pass "All previously-recorded storage keys are still present"
+  REMOVED_KEYS=0
+  while IFS= read -r key; do
+    [[ -z "$key" || "$key" == \#* ]] && continue
+    if ! grep -qx "$key" <<<"$CURRENT_KEYS"; then
+      REMOVED_KEYS=$((REMOVED_KEYS+1))
+      risk "DataKey::$key" "DataKey::$key is missing from the new source; stored data under it becomes unreachable"
     fi
-  else
-    warn "No storage key reference file at $COMPAT_REFERENCE"
-    info "Run 'make snapshot-storage-keys' (or the command below) to create it:"
-    info "  grep -oP '(?<=DataKey::)\w+' $CONTRACT_SRC | sort -u > $COMPAT_REFERENCE"
-    info "Then re-run this check on the next upgrade."
-  fi
+  done < "$KEYS_BASELINE"
+  [[ "$REMOVED_KEYS" -eq 0 ]] && pass "All storage keys in the baseline are still present"
 fi
 
 # ---------------------------------------------------------------------------
-# Check 3 — Struct field changes
+# Check 3 — Persisted struct fields
 # ---------------------------------------------------------------------------
 echo ""
-echo "--- Check 3: Public struct field changes ---"
+echo "--- Check 3: Persisted struct fields ---"
 
 if [[ ! -f "$CONTRACT_SRC" ]]; then
-  warn "Source not found — skipping struct diff"
+  fail "Contract source not found at $CONTRACT_SRC"
+elif [[ ! -f "$STRUCT_BASELINE" ]]; then
+  fail "No struct baseline at $STRUCT_BASELINE — storage layout cannot be verified"
+  info "Check out the currently-deployed version, then run: ./scripts/snapshot-contract-state.sh $CONTRACT"
 else
-  # Count fields in key structs that affect persistent storage
-  KEY_STRUCTS="ProvenanceCert VerificationRequest ProviderSLA CostEstimate ProviderInfo"
-  for STRUCT in $KEY_STRUCTS; do
-    COUNT=$(awk "/pub struct $STRUCT/,/^}/" "$CONTRACT_SRC" 2>/dev/null | grep -c 'pub ' || true)
-    if [[ "$COUNT" -gt 0 ]]; then
-      info "  $STRUCT: $COUNT pub fields"
-    fi
-  done
+  CURRENT_FIELDS=$(surface_struct_fields "$CONTRACT_SRC")
+  BASE_FIELDS=$(grep -v '^#' "$STRUCT_BASELINE" | grep . || true)
+  FIELD_RISKS_BEFORE=${#RISK_TOKENS[@]}
 
-  STRUCT_SNAPSHOT="docs/operations/struct-snapshot-${CONTRACT}.txt"
-  if [[ -f "$STRUCT_SNAPSHOT" ]]; then
-    # Simple diff of field counts vs snapshot
-    DIFF_RESULT=$(diff <(awk '/^#[[:space:]]/{name=$2} /pub /{print name, $0}' "$STRUCT_SNAPSHOT") \
-                       <(for S in $KEY_STRUCTS; do
-                           awk "/pub struct $S/,/^}/" "$CONTRACT_SRC" 2>/dev/null | \
-                           grep 'pub ' | sed "s/^/  $S: /"
-                         done) 2>/dev/null || true)
-    if [[ -n "$DIFF_RESULT" ]]; then
-      warn "Struct fields appear to have changed since the last snapshot:"
-      info "$DIFF_RESULT"
-      info "If fields were added, removed, or reordered, existing persistent storage entries"
-      info "may not deserialise correctly. Review the migration doc: $MIGRATION_DOC"
+  # A line in the baseline that is not in the source is removed or changed.
+  while IFS= read -r line; do
+    [[ -z "$line" ]] && continue
+    grep -qxF "$line" <<<"$CURRENT_FIELDS" && continue
+    struct=$(surface_struct_name "$line")
+    field=$(surface_field_name "$line")
+    risk "$struct.$field" "$struct.$field was removed or changed; existing entries may not deserialise"
+  done <<<"$BASE_FIELDS"
+
+  # A line in the source that is not in the baseline is new. Optional fields are safe,
+  # because existing entries read them as None.
+  while IFS= read -r line; do
+    [[ -z "$line" ]] && continue
+    grep -qxF "$line" <<<"$BASE_FIELDS" && continue
+    struct=$(surface_struct_name "$line")
+    field=$(surface_field_name "$line")
+    if [[ "$line" == *"Option<"* ]]; then
+      info "New optional field $struct.$field (existing entries read it as None)"
     else
-      pass "Struct fields match the previous snapshot"
+      risk "$struct.$field" "$struct.$field is a new required field; existing entries must be migrated"
     fi
-  else
-    warn "No struct snapshot at $STRUCT_SNAPSHOT — cannot diff field changes"
-    info "Create the snapshot after this check passes using 'make snapshot-structs'"
-  fi
+  done <<<"$CURRENT_FIELDS"
+
+  [[ ${#RISK_TOKENS[@]} -eq "$FIELD_RISKS_BEFORE" ]] && pass "Persisted struct fields match the baseline"
 fi
 
 # ---------------------------------------------------------------------------
-# Check 4 — Migration sequence doc
+# Check 4 — Public entry points
 # ---------------------------------------------------------------------------
 echo ""
-echo "--- Check 4: Migration sequence documentation ---"
+echo "--- Check 4: Public entry points ---"
+
+if [[ ! -f "$CONTRACT_SRC" ]]; then
+  fail "Contract source not found at $CONTRACT_SRC"
+elif [[ ! -f "$API_BASELINE" ]]; then
+  fail "No entry point baseline at $API_BASELINE — removed functions cannot be detected"
+  info "Check out the currently-deployed version, then run: ./scripts/snapshot-contract-state.sh $CONTRACT"
+else
+  CURRENT_API=$(surface_entry_points "$CONTRACT_SRC")
+  API_RISKS_BEFORE=${#RISK_TOKENS[@]}
+  while IFS= read -r fn; do
+    [[ -z "$fn" || "$fn" == \#* ]] && continue
+    if ! grep -qx "$fn" <<<"$CURRENT_API"; then
+      risk "$fn" "public function $fn was removed; existing clients calling it will fail"
+    fi
+  done < "$API_BASELINE"
+  [[ ${#RISK_TOKENS[@]} -eq "$API_RISKS_BEFORE" ]] && pass "All public entry points in the baseline are still present"
+fi
+
+# ---------------------------------------------------------------------------
+# Check 5 — Migration doc
+# ---------------------------------------------------------------------------
+echo ""
+echo "--- Check 5: Migration documentation ---"
+
+UNIQUE_RISKS=()
+if [[ ${#RISK_TOKENS[@]} -gt 0 ]]; then
+  mapfile -t UNIQUE_RISKS < <(printf '%s\n' "${RISK_TOKENS[@]}" | sort -u)
+  info "Risky changes found: ${#UNIQUE_RISKS[@]} (listed in the summary below)"
+fi
 
 if [[ -f "$MIGRATION_DOC" ]]; then
   pass "Migration doc found: $MIGRATION_DOC"
 
-  # Verify required sections are present
   REQUIRED_SECTIONS=("Pre-migration" "Migration steps" "Post-migration" "Rollback")
   for SECTION in "${REQUIRED_SECTIONS[@]}"; do
     if grep -qi "## $SECTION" "$MIGRATION_DOC" 2>/dev/null; then
       pass "  Section present: '$SECTION'"
+    elif [[ "$NETWORK" == "mainnet" ]]; then
+      fail "  Missing section on mainnet: '## $SECTION' in $MIGRATION_DOC"
     else
-      warn "  Missing section: '## $SECTION'"
-      info "  Add this section to $MIGRATION_DOC"
+      warn "  Missing section: '## $SECTION' (required before mainnet)"
+    fi
+  done
+
+  for TOKEN in "${UNIQUE_RISKS[@]}"; do
+    if grep -qF -- "$TOKEN" "$MIGRATION_DOC"; then
+      pass "  Risk documented: $TOKEN"
+    else
+      fail "  Risk not documented: $TOKEN — name it in the storage compatibility analysis of $MIGRATION_DOC"
     fi
   done
 else
-  # Only fail for mainnet; warn for testnet
   if [[ "$NETWORK" == "mainnet" ]]; then
     fail "Migration doc REQUIRED for mainnet upgrades: $MIGRATION_DOC"
     info "Create it from the template: cp docs/operations/migration-template.md $MIGRATION_DOC"
+  elif [[ ${#UNIQUE_RISKS[@]} -gt 0 ]]; then
+    fail "Migration doc REQUIRED because risky changes were found (even on testnet): $MIGRATION_DOC"
+    info "Create it from the template: cp docs/operations/migration-template.md $MIGRATION_DOC"
   else
     warn "No migration doc at $MIGRATION_DOC"
-    info "This is acceptable for testnet but required before mainnet."
-    info "Create one from: docs/operations/migration-template.md"
+    info "This is acceptable for testnet with no risky changes, but required before mainnet."
   fi
 fi
 
 # ---------------------------------------------------------------------------
-# Check 5 — Rollback feasibility
+# Check 6 — Rollback feasibility
 # ---------------------------------------------------------------------------
 echo ""
-echo "--- Check 5: Rollback feasibility ---"
+echo "--- Check 6: Rollback feasibility ---"
 
 if [[ -f "$DEPLOYMENT_LOG" ]]; then
-  # Check that at least one recent entry exists for this contract
   if grep -qi "$CONTRACT" "$DEPLOYMENT_LOG" 2>/dev/null; then
     pass "Deployment log found and contains entries for '$CONTRACT'"
     info "Verify that the CURRENT contract ID is recorded before proceeding."
@@ -238,7 +279,6 @@ else
   info "Template: docs/operations/deployment-log.md (see migration-template.md for structure)"
 fi
 
-# Check rollback section in the main deployment doc
 if grep -qi "rollback" "docs/deployment.md" 2>/dev/null; then
   pass "Rollback procedures present in docs/deployment.md"
 else
@@ -246,23 +286,21 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# Check 6 — Admin / initialise guard
+# Check 7 — Admin / initialise guard
 # ---------------------------------------------------------------------------
 echo ""
-echo "--- Check 6: Contract admin / initialise guard ---"
+echo "--- Check 7: Contract admin / initialise guard ---"
 
 if [[ ! -f "$CONTRACT_SRC" ]]; then
   warn "Source not found — skipping admin check"
 else
-  # Look for an admin-check pattern
-  if grep -q 'require_admin\|require_auth.*admin\|Admin.*require_auth' "$CONTRACT_SRC" 2>/dev/null; then
+  if grep -q 'require_admin\|require_auth.*admin\|Admin.*require_auth\|oracle.require_auth' "$CONTRACT_SRC" 2>/dev/null; then
     pass "Admin authorisation guard found in contract source"
   else
     warn "No admin auth pattern found — confirm the contract has access control before deploying"
   fi
 
-  # Check for initialise guard (prevent double-init)
-  if grep -qE 'AlreadyInitialized|Already initialized|already_init' "$CONTRACT_SRC" 2>/dev/null; then
+  if grep -qE 'AlreadyInitialized|Already initialized|already_init|Contract already initialized' "$CONTRACT_SRC" 2>/dev/null; then
     pass "Double-initialise guard found"
   else
     warn "No double-initialise guard detected — verify the contract cannot be re-initialised"
@@ -270,10 +308,10 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# Check 7 — Mainnet safety gate
+# Check 8 — Network safety gate
 # ---------------------------------------------------------------------------
 echo ""
-echo "--- Check 7: Network safety gate ---"
+echo "--- Check 8: Network safety gate ---"
 
 if [[ "$NETWORK" == "mainnet" ]]; then
   if [[ "$CONFIRM" != "--confirm" ]]; then
@@ -292,6 +330,12 @@ fi
 # ---------------------------------------------------------------------------
 echo ""
 echo "================================================================"
+if [[ ${#UNIQUE_RISKS[@]} -gt 0 ]]; then
+  echo "Risky changes (${#UNIQUE_RISKS[@]}):"
+  for TOKEN in "${UNIQUE_RISKS[@]}"; do info "  - $TOKEN"; done
+  echo ""
+fi
+
 if [[ "$FAILED" -eq 0 ]]; then
   echo -e "${GREEN}ALL CHECKS PASSED — safe to proceed with deployment${NC}"
   echo ""
