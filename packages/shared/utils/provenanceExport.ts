@@ -7,6 +7,12 @@ import type {
 export const PROVENANCE_EXPORT_SCHEMA_VERSION = "1.0.0";
 /** Max records per exported file; larger exports are split into parts. */
 export const PROVENANCE_EXPORT_CHUNK_SIZE = 5_000;
+/** Hard ceiling on records in one export. Requests above it are refused, never silently truncated. */
+export const PROVENANCE_EXPORT_MAX_RECORDS = 50_000;
+/** Safe default record limit for a new export. */
+export const PROVENANCE_EXPORT_DEFAULT_LIMIT = 10_000;
+/** Record limits offered to the user, all at or below the hard ceiling. */
+export const PROVENANCE_EXPORT_LIMIT_OPTIONS = [1_000, 5_000, 10_000, 25_000, 50_000] as const;
 
 /** Stable column order shared by CSV headers and JSON keys. */
 export const PROVENANCE_EXPORT_COLUMNS: (keyof ProvenanceRecord)[] = [
@@ -92,6 +98,21 @@ export function chunkRecords<T>(records: T[], size = PROVENANCE_EXPORT_CHUNK_SIZ
   const chunks: T[][] = [];
   for (let i = 0; i < records.length; i += size) chunks.push(records.slice(i, i + size));
   return chunks;
+}
+
+/**
+ * Checks a requested export against the user's record limit and the hard ceiling.
+ * Returns a user-facing message when the export must not run, or null when it may.
+ */
+export function validateExportLimit(recordCount: number, limit: number): string | null {
+  const max = PROVENANCE_EXPORT_MAX_RECORDS.toLocaleString();
+  if (!Number.isInteger(limit) || limit < 1 || limit > PROVENANCE_EXPORT_MAX_RECORDS) {
+    return `Record limit must be a whole number from 1 to ${max}.`;
+  }
+  if (recordCount > limit) {
+    return `This export has ${recordCount.toLocaleString()} records, above the ${limit.toLocaleString()} record limit. Narrow the status or date filters, or raise the limit (up to ${max}).`;
+  }
+  return null;
 }
 
 /** Basic structural validation run before an export is offered for download. */
