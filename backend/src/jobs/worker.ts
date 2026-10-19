@@ -2,7 +2,7 @@ import type { WithId } from "mongodb";
 import type { Logger } from "../lib/logger.js";
 import { sleep } from "../lib/retry.js";
 import type { JobDoc, QueueName } from "../db/collections.js";
-import { JobError } from "./errors.js";
+import { JobError, describeError } from "./errors.js";
 import type { JobQueue } from "./queue.js";
 
 export interface JobContext {
@@ -124,7 +124,7 @@ export class Worker {
       try {
         await this.queue.fail(job, workerId, err, performance.now() - started);
       } catch (recordErr) {
-        log.error("could not record job failure; stall recovery will requeue it", { err: recordErr, jobError: String(err) });
+        log.error("could not record job failure; stall recovery will requeue it", { ...describeError(err), err: recordErr });
       }
     } finally {
       clearInterval(heartbeat);
