@@ -175,9 +175,27 @@ export function CertificateResultCard({
   // Compute confidence from the oracle evidence + manifest attached to this result
   const confidence = useConfidenceScore(result.evidence, result.manifest);
   const anchors = result.anchors ?? [];
+  const outcome = result.isRevoked
+    ? "revoked"
+    : result.isExpired
+      ? "expired"
+      : result.isValid
+        ? "valid"
+        : "not valid";
+  const evidenceSummary = result.evidence
+    ? [
+        `attestation ${result.evidence.attestationValid ? "valid" : "invalid"}`,
+        `verifier code ${result.evidence.teeCodeHashApproved ? "approved" : "not approved"}`,
+        `content hash ${result.evidence.contentHashMatches ? "matches" : "does not match"}`,
+        `creator signature ${result.evidence.creatorSigned ? "present" : "missing"}`,
+      ].join(", ")
+    : "attestation evidence unavailable";
 
   return (
     <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
+      <p className="sr-only">
+        Verification result for certificate {certificate.id}: {outcome} ({statusLabel}). Evidence: {evidenceSummary}.
+      </p>
       {/* ── Header ── */}
       <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">

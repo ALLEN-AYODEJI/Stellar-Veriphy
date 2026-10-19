@@ -36,7 +36,7 @@ const EVENT_LABELS: Record<ProvenanceEventType, string> = {
 const STATUS_SUMMARY: Record<VerificationRecord["status"], string> = {
   certified: "This content was verified and a provenance certificate was recorded on the Stellar blockchain.",
   processing: "Verification is in progress. Evidence will appear here as each check completes.",
-  pending: "This content is waiting to be verified.",
+  pending: "This request is waiting for an independent verification service to begin its review. It starts automatically; return here for the result and evidence.",
   failed: "Verification did not pass, so no certificate was issued. See the evidence and history below for why.",
 };
 
@@ -207,7 +207,11 @@ export default async function CertificateDetail({ params }: { params: Params }) 
                 ))}
               </ol>
             ) : (
-              <p className="text-sm text-slate-500">No history recorded yet.</p>
+              <p className="text-sm text-slate-500">
+                {record.status === "pending"
+                  ? "Review updates will appear here after the verification service starts."
+                  : "No history recorded yet."}
+              </p>
             )}
           </Section>
         </div>
