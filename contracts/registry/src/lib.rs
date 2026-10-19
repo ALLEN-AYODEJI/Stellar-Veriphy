@@ -1,5 +1,5 @@
 #![no_std]
-use soroban_sdk::{contract, contractimpl, Bytes, Env, Symbol};
+
 //! # StellarVeriphy — Registry Contract
 //!
 //! Maintains the on-chain registry of:
@@ -41,7 +41,6 @@ use soroban_sdk::{contract, contractimpl, Bytes, Env, Symbol};
 //! assert!(approved);
 //! ```
 
-#![no_std]
 use soroban_sdk::{
     contract, contracterror, contractimpl, contracttype, symbol_short, Address, Bytes, BytesN, Env,
     String, Symbol, Vec,
@@ -431,6 +430,8 @@ impl RegistryContract {
     /// Check if a TEE code hash is approved.
     pub fn is_approved(env: Env, code_hash: Bytes) -> bool {
         env.storage().persistent().get(&code_hash).unwrap_or(false)
+    }
+
     /// One-time initialisation.
     pub fn init(env: Env, admin: Address, provenance: Address) {
         if env.storage().instance().has(&DataKey::Admin) {
@@ -506,7 +507,9 @@ impl RegistryContract {
         };
         env.storage()
             .persistent()
-            .set(&DataKey::TeeHashInfo(code_hash), &record);
+            .set(&DataKey::TeeHashInfo(code_hash.clone()), &record);
+        env.events()
+            .publish((Symbol::new(env, "tee_hash_added"),), code_hash);
     }
 
     /// Check whether a TEE code hash is approved, not rotated and not expired.  #22 #23 #191
@@ -3176,3 +3179,5 @@ mod tests {
 // event emission, and error paths across the registry contract.
 #[cfg(test)]
 mod integration_tests;
+#[cfg(test)]
+mod smoke_tests;

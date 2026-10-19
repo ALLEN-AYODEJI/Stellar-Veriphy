@@ -6,7 +6,7 @@
 /// multi-step workflows rather than individual function behaviour.
 #[cfg(test)]
 mod oracle_integration_tests {
-    use oracle::{Error, OracleContract, OracleContractClient, Priority, RequestState};
+    use crate::{Error, OracleContract, OracleContractClient, Priority, RequestState};
     use soroban_sdk::{
         testutils::{Address as _, Events, Ledger as _},
         Address, Bytes, Env,
@@ -155,7 +155,7 @@ mod oracle_integration_tests {
             &Priority::Normal,
         );
 
-        client.cancel_request(&id, &requester);
+        client.cancel_request(&id);
 
         let req = client.get_request(&id).expect("request should still exist");
         assert_eq!(req.state, RequestState::Cancelled);
