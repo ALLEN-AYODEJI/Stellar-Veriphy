@@ -28,6 +28,7 @@
     "test": "pnpm -r --if-present run test",
     "test:e2e": "pnpm --filter frontend test:e2e",
     "test:coverage": "pnpm -r --if-present run test:coverage",
+    "test:contracts:smoke": "bash scripts/contracts-smoke.sh",
     "test:mutation": "pnpm --filter @stellarveriphy/shared run test:mutation",
     "test:load:frontend": "k6 run ./load-tests/frontend-load.js",
     "test:load:contracts": "k6 run ./load-tests/contract-load.js",
@@ -37,7 +38,13 @@
     "release": "semantic-release",
     "prepare": "husky"
   },
-  "keywords": ["stellar", "soroban", "blockchain", "verification", "provenance"],
+  "keywords": [
+    "stellar",
+    "soroban",
+    "blockchain",
+    "verification",
+    "provenance"
+  ],
   "license": "MIT",
   "packageManager": "pnpm@10.18.2",
   "lint-staged": {
@@ -45,8 +52,12 @@
       "prettier --write",
       "pnpm --filter frontend exec eslint --fix --config eslint.config.mjs"
     ],
-    "**/*.{js,jsx,json,css,md,yml,yaml}": ["prettier --write"],
-    "contracts/**/*.rs": ["rustfmt --edition 2021"]
+    "**/*.{js,jsx,json,css,md,yml,yaml}": [
+      "prettier --write"
+    ],
+    "contracts/**/*.rs": [
+      "rustfmt --edition 2021"
+    ]
   },
   "devDependencies": {
     "@semantic-release/changelog": "^7.0.0",

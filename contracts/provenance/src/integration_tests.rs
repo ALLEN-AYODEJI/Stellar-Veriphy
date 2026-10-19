@@ -4,7 +4,11 @@
 /// and lock. Validates storage mutations and event emission at each step.
 #[cfg(test)]
 mod provenance_integration_tests {
-    use provenance::{
+    extern crate std;
+    use std::format;
+    use std::string::ToString;
+
+    use crate::{
         CertificateRollbackRecord, ProvenanceContract, ProvenanceContractClient, ProvenanceError,
         RevocationReason, RollbackReason,
     };
@@ -169,7 +173,7 @@ mod provenance_integration_tests {
 
         let id = mint_one(&env, &client, "xfr", &original_owner);
 
-        client.transfer_certificate(&id, &original_owner, &new_owner);
+        client.transfer_certificate(&id, &new_owner);
 
         let owner_after = client.get_owner(&id);
         assert_eq!(
