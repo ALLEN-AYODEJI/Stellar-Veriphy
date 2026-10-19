@@ -16,6 +16,7 @@ import type {
   ModerationStatus,
 } from "@stellarveriphy/shared";
 import DisputeAuditTrail from "@/components/DisputeAuditTrail";
+import { formatDateTime } from "@/utils/formatDateTime";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -407,6 +408,7 @@ export function ModerationQueue({ defaultStatusFilter }: Props) {
                   <th className="px-4 py-3">Trigger</th>
                   <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3">Created</th>
+                  <th className="px-4 py-3">Last updated</th>
                   <th className="px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
@@ -431,7 +433,10 @@ export function ModerationQueue({ defaultStatusFilter }: Props) {
                       <StatusBadge status={item.status} />
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
-                      {new Date(item.createdAt).toLocaleDateString()}
+                      {formatDateTime(item.createdAt) ?? "Date unavailable"}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
+                      {formatDateTime(item.updatedAt) ?? "Date unavailable"}
                     </td>
                     <td className="px-4 py-3 text-right">
                       <button
