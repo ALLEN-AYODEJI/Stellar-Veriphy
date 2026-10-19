@@ -8,19 +8,29 @@
  * secrets are displayed exactly once, immediately after issue/rotate.
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   API_TOKEN_SURFACES,
-  DEFAULT_ROTATION_GRACE_HOURS,
-  SURFACE_ALLOWED_SCOPES,
-  SURFACE_TTL_DAYS,
   type ApiTokenScope,
   type ApiTokenStatus,
   type ApiTokenSurface,
+  DEFAULT_ROTATION_GRACE_HOURS,
   type PublicApiToken,
+  SURFACE_ALLOWED_SCOPES,
+  SURFACE_TTL_DAYS,
 } from "@stellarveriphy/shared";
+import { useCallback, useEffect, useMemo, useState } from "react";
+
+import { type MessageKey,t } from "@/lib/i18n";
 
 const ADMIN_TOKEN_KEY = "sv_admin_api_token";
+
+const STATUS_LABEL_KEYS: Record<ApiTokenStatus, MessageKey> = {
+  active: "admin.tokens.status.active",
+  expiring: "admin.tokens.status.expiring",
+  rotating: "admin.tokens.status.rotating",
+  expired: "admin.tokens.status.expired",
+  revoked: "admin.tokens.status.revoked",
+};
 
 const STATUS_STYLES: Record<ApiTokenStatus, string> = {
   active: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300",
@@ -70,9 +80,9 @@ export function ApiTokenManager() {
       const res = await fetch("/api/tokens", { headers, cache: "no-store" });
       const data = await res.json();
       if (data.success) setTokens(data.data);
-      else setError(data.error ?? "Failed to load tokens.");
+      else setError(data.error ?? t("admin.tokens.error.load"));
     } catch {
-      setError("Network error.");
+      setError(t("admin.common.networkError"));
     } finally {
       setLoading(false);
     }
@@ -105,7 +115,7 @@ export function ApiTokenManager() {
     const res = await fetch(url, { ...init, headers });
     const data = await res.json();
     if (!data.success) {
-      setError(data.error ?? "Request failed.");
+      setError(data.error ?? t("admin.common.requestFailed"));
       return null;
     }
     await load();
@@ -143,7 +153,7 @@ export function ApiTokenManager() {
     <div className="space-y-6">
       <section className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 space-y-2">
         <label htmlFor="admin-token" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-          Admin token (tokens:manage)
+          {t("admin.tokens.adminToken.label")}
         </label>
         <input
           id="admin-token"
@@ -155,14 +165,14 @@ export function ApiTokenManager() {
           className={inputClass}
         />
         <p className="text-xs text-gray-500 dark:text-gray-400">
-          Kept in this tab&apos;s session storage only. Not required when enforcement is off (local development).
+          {t("admin.tokens.adminToken.help")}
         </p>
       </section>
 
       {revealed && (
         <div role="alert" className="rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-700 p-4 space-y-2">
           <p className="text-sm font-semibold text-amber-900 dark:text-amber-200">
-            Copy this secret now — it will not be shown again.
+            {t("admin.tokens.reveal.copyNow")}
           </p>
           <code className="block break-all rounded bg-white dark:bg-gray-900 p-2 text-xs font-mono text-gray-900 dark:text-gray-100">
             {revealed.secret}
@@ -173,32 +183,32 @@ export function ApiTokenManager() {
               onClick={() => void navigator.clipboard?.writeText(revealed.secret)}
               className="rounded-md bg-amber-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-700"
             >
-              Copy
+              {t("admin.tokens.reveal.copy")}
             </button>
             <button
               type="button"
               onClick={() => setRevealed(null)}
               className="rounded-md border border-amber-400 px-3 py-1.5 text-xs font-medium text-amber-900 dark:text-amber-200"
             >
-              I have stored it
+              {t("admin.tokens.reveal.stored")}
             </button>
           </div>
         </div>
       )}
 
       <section className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 space-y-4">
-        <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">Issue a token</h2>
+        <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">{t("admin.tokens.issue.heading")}</h2>
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
-            <label htmlFor="tok-name" className="block text-sm text-gray-700 dark:text-gray-300 mb-1">Name</label>
+            <label htmlFor="tok-name" className="block text-sm text-gray-700 dark:text-gray-300 mb-1">{t("admin.tokens.issue.name")}</label>
             <input id="tok-name" value={name} onChange={(e) => setName(e.target.value)} className={inputClass} placeholder="CI export job" />
           </div>
           <div>
-            <label htmlFor="tok-owner" className="block text-sm text-gray-700 dark:text-gray-300 mb-1">Owner (address or service id)</label>
+            <label htmlFor="tok-owner" className="block text-sm text-gray-700 dark:text-gray-300 mb-1">{t("admin.tokens.issue.owner")}</label>
             <input id="tok-owner" value={owner} onChange={(e) => setOwner(e.target.value)} className={inputClass} placeholder="G… or svc-name" />
           </div>
           <div>
-            <label htmlFor="tok-surface" className="block text-sm text-gray-700 dark:text-gray-300 mb-1">Surface</label>
+            <label htmlFor="tok-surface" className="block text-sm text-gray-700 dark:text-gray-300 mb-1">{t("admin.tokens.issue.surface")}</label>
             <select id="tok-surface" value={surface} onChange={(e) => changeSurface(e.target.value as ApiTokenSurface)} className={inputClass}>
               {API_TOKEN_SURFACES.map((s) => (
                 <option key={s} value={s}>{s}</option>
@@ -207,7 +217,7 @@ export function ApiTokenManager() {
           </div>
           <div>
             <label htmlFor="tok-ttl" className="block text-sm text-gray-700 dark:text-gray-300 mb-1">
-              Lifetime (days, max {SURFACE_TTL_DAYS[surface].max})
+              {t("admin.tokens.issue.lifetime", { max: SURFACE_TTL_DAYS[surface].max })}
             </label>
             <input
               id="tok-ttl"
@@ -221,7 +231,7 @@ export function ApiTokenManager() {
           </div>
         </div>
         <fieldset>
-          <legend className="text-sm text-gray-700 dark:text-gray-300 mb-2">Scopes allowed for {surface}</legend>
+          <legend className="text-sm text-gray-700 dark:text-gray-300 mb-2">{t("admin.tokens.issue.scopes", { surface })}</legend>
           <div className="flex flex-wrap gap-2">
             {SURFACE_ALLOWED_SCOPES[surface].map((scope) => (
               <label key={scope} className="inline-flex items-center gap-1.5 rounded-full border border-gray-300 dark:border-gray-600 px-3 py-1 text-xs text-gray-700 dark:text-gray-300">
@@ -237,7 +247,7 @@ export function ApiTokenManager() {
           disabled={scopes.length === 0}
           className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
         >
-          Issue token
+          {t("admin.tokens.issue.submit")}
         </button>
       </section>
 
@@ -249,62 +259,62 @@ export function ApiTokenManager() {
         <table className="min-w-full text-sm">
           <thead className="bg-gray-50 dark:bg-gray-900/50 text-left text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
             <tr>
-              <th className="px-4 py-2">Token</th>
-              <th className="px-4 py-2">Surface / scopes</th>
-              <th className="px-4 py-2">Status</th>
-              <th className="px-4 py-2">Expires</th>
-              <th className="px-4 py-2">Last used</th>
-              <th className="px-4 py-2 sr-only">Actions</th>
+              <th className="px-4 py-2">{t("admin.tokens.table.token")}</th>
+              <th className="px-4 py-2">{t("admin.tokens.table.surfaceScopes")}</th>
+              <th className="px-4 py-2">{t("admin.tokens.table.status")}</th>
+              <th className="px-4 py-2">{t("admin.tokens.table.expires")}</th>
+              <th className="px-4 py-2">{t("admin.tokens.table.lastUsed")}</th>
+              <th className="px-4 py-2 sr-only">{t("admin.tokens.table.actions")}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
             {loading && tokens.length === 0 && (
-              <tr><td colSpan={6} className="px-4 py-6 text-center text-gray-500">Loading…</td></tr>
+              <tr><td colSpan={6} className="px-4 py-6 text-center text-gray-500">{t("admin.common.loading")}</td></tr>
             )}
             {!loading && tokens.length === 0 && (
-              <tr><td colSpan={6} className="px-4 py-6 text-center text-gray-500">No tokens issued yet.</td></tr>
+              <tr><td colSpan={6} className="px-4 py-6 text-center text-gray-500">{t("admin.tokens.table.empty")}</td></tr>
             )}
-            {tokens.map((t) => {
-              const live = t.status === "active" || t.status === "expiring";
+            {tokens.map((token) => {
+              const live = token.status === "active" || token.status === "expiring";
               return (
-                <tr key={t.id} className="align-top">
+                <tr key={token.id} className="align-top">
                   <td className="px-4 py-3">
-                    <p className="font-medium text-gray-900 dark:text-gray-100">{t.name}</p>
-                    <p className="font-mono text-xs text-gray-500">{t.displayPrefix}</p>
-                    <p className="text-xs text-gray-400">{t.owner}</p>
+                    <p className="font-medium text-gray-900 dark:text-gray-100">{token.name}</p>
+                    <p className="font-mono text-xs text-gray-500">{token.displayPrefix}</p>
+                    <p className="text-xs text-gray-400">{token.owner}</p>
                   </td>
                   <td className="px-4 py-3">
-                    <p className="text-gray-900 dark:text-gray-100">{t.surface}</p>
-                    <p className="text-xs text-gray-500">{t.scopes.join(", ")}</p>
+                    <p className="text-gray-900 dark:text-gray-100">{token.surface}</p>
+                    <p className="text-xs text-gray-500">{token.scopes.join(", ")}</p>
                   </td>
                   <td className="px-4 py-3">
-                    <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${STATUS_STYLES[t.status]}`}>
-                      {t.status}
+                    <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${STATUS_STYLES[token.status]}`}>
+                      {t(STATUS_LABEL_KEYS[token.status])}
                     </span>
-                    {t.status === "rotating" && (
-                      <p className="mt-1 text-xs text-gray-500">Grace until {formatDate(t.graceUntil)}</p>
+                    {token.status === "rotating" && (
+                      <p className="mt-1 text-xs text-gray-500">{t("admin.tokens.table.graceUntil", { date: formatDate(token.graceUntil) })}</p>
                     )}
-                    {t.revocationReason && <p className="mt-1 text-xs text-gray-500">{t.revocationReason}</p>}
+                    {token.revocationReason && <p className="mt-1 text-xs text-gray-500">{token.revocationReason}</p>}
                   </td>
-                  <td className="px-4 py-3 text-xs text-gray-600 dark:text-gray-400">{formatDate(t.expiresAt)}</td>
-                  <td className="px-4 py-3 text-xs text-gray-600 dark:text-gray-400">{formatDate(t.lastUsedAt)}</td>
+                  <td className="px-4 py-3 text-xs text-gray-600 dark:text-gray-400">{formatDate(token.expiresAt)}</td>
+                  <td className="px-4 py-3 text-xs text-gray-600 dark:text-gray-400">{formatDate(token.lastUsedAt)}</td>
                   <td className="px-4 py-3">
                     {live && (
                       <div className="flex flex-col gap-1">
-                        <button type="button" onClick={() => void rotate(t.id)} className="text-xs text-blue-600 hover:underline text-left">
-                          Rotate ({DEFAULT_ROTATION_GRACE_HOURS}h grace)
+                        <button type="button" onClick={() => void rotate(token.id)} className="text-xs text-blue-600 hover:underline text-left">
+                          {t("admin.tokens.action.rotate", { hours: DEFAULT_ROTATION_GRACE_HOURS })}
                         </button>
-                        <button type="button" onClick={() => void revoke(t.id, "user_requested")} className="text-xs text-gray-600 dark:text-gray-300 hover:underline text-left">
-                          Revoke
+                        <button type="button" onClick={() => void revoke(token.id, "user_requested")} className="text-xs text-gray-600 dark:text-gray-300 hover:underline text-left">
+                          {t("admin.tokens.action.revoke")}
                         </button>
-                        <button type="button" onClick={() => void rotate(t.id, true)} className="text-xs text-red-600 hover:underline text-left">
-                          Compromised: rotate now
+                        <button type="button" onClick={() => void rotate(token.id, true)} className="text-xs text-red-600 hover:underline text-left">
+                          {t("admin.tokens.action.rotateCompromised")}
                         </button>
                       </div>
                     )}
-                    {t.status === "rotating" && (
-                      <button type="button" onClick={() => void revoke(t.id, "compromised")} className="text-xs text-red-600 hover:underline text-left">
-                        End grace &amp; revoke
+                    {token.status === "rotating" && (
+                      <button type="button" onClick={() => void revoke(token.id, "compromised")} className="text-xs text-red-600 hover:underline text-left">
+                        {t("admin.tokens.action.endGrace")}
                       </button>
                     )}
                   </td>
