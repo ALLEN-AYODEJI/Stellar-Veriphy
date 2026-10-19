@@ -2521,6 +2521,9 @@ mod test;
 #[cfg(test)]
 mod integration_tests;
 
+#[cfg(test)]
+mod revert_tests;
+
 // ---------------------------------------------------------------------------
 // Multi-anchor provenance (ADR-0008)
 //

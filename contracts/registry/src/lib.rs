@@ -3189,3 +3189,6 @@ mod tests {
 // event emission, and error paths across the registry contract.
 #[cfg(test)]
 mod integration_tests;
+
+#[cfg(test)]
+mod revert_tests;

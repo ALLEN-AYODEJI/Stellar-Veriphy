@@ -2347,3 +2347,6 @@ mod test;
 // event emission, and error paths across the oracle contract.
 #[cfg(test)]
 mod integration_tests;
+
+#[cfg(test)]
+mod revert_tests;
