@@ -1,13 +1,3 @@
-#![no_std]
-use soroban_sdk::{contract, contractimpl, contracttype, Bytes, Env, Symbol};
-
-#[contracttype]
-pub struct ProvenanceCert {
-    pub storage_ref: Bytes,
-    pub manifest_hash: Bytes,
-    pub attestation_hash: Bytes,
-    pub creator: soroban_sdk::Address,
-    pub timestamp: u64,
 //! # StellarVeriphy — Provenance Contract
 //!
 //! Mints and manages **on-chain provenance certificates** that bind a piece
@@ -63,9 +53,14 @@ pub struct ProvenanceCert {
 //! ```
 
 #![no_std]
+// `Events::publish` is deprecated in favour of `#[contractevent]`; migrating the
+// event layer is tracked separately, so the deprecation is allowed here for now.
+#![allow(deprecated)]
+// Entry points mirror the on-chain ABI, so their argument lists are kept flat.
+#![allow(clippy::too_many_arguments)]
 use soroban_sdk::{
     contract, contracterror, contractevent, contractimpl, contracttype, symbol_short, Address,
-    Bytes, BytesN, Env, String, Vec,
+    Bytes, BytesN, Env, String, Symbol, Vec,
 };
 
 // #179 — bucket width for the minting time series / velocity stats
@@ -89,6 +84,7 @@ pub enum ProvenanceError {
     InvalidTagLength = 12,
     MaxTagsExceeded = 13,
     InvalidOwner = 14,
+    AlreadyRevoked = 15,
 }
 
 // #171 — Revocation reason
@@ -507,28 +503,6 @@ pub struct ProvenanceContract;
 
 #[contractimpl]
 impl ProvenanceContract {
-    /// Mint a provenance certificate after TEE attestation.
-    pub fn mint(
-        env: Env,
-        storage_ref: Bytes,
-        manifest_hash: Bytes,
-        attestation_hash: Bytes,
-        creator: soroban_sdk::Address,
-    ) -> u64 {
-        creator.require_auth();
-        let id: u64 = env.ledger().sequence() as u64;
-        let cert = ProvenanceCert {
-            storage_ref,
-            manifest_hash,
-            attestation_hash,
-            creator,
-            timestamp: env.ledger().timestamp(),
-        };
-        env.storage().persistent().set(&id, &cert);
-        env.events().publish((Symbol::new(&env, "minted"),), id);
-        id
-    }
-
     pub fn get(env: Env, id: u64) -> ProvenanceCert {
         env.storage().persistent().get(&id).unwrap()
     }
@@ -602,10 +576,10 @@ impl ProvenanceContract {
 
         let mut records: Vec<CertificateRollbackRecord> = Vec::new(&env);
         for id in ids.iter() {
-            if let Some(record) =
-                env.storage()
-                    .persistent()
-                    .get::<DataKey, CertificateRollbackRecord>(&DataKey::RollbackRecord(id))
+            if let Some(record) = env
+                .storage()
+                .persistent()
+                .get::<DataKey, CertificateRollbackRecord>(&DataKey::RollbackRecord(id))
             {
                 records.push_back(record);
             }
@@ -621,7 +595,7 @@ fn calculate_verification_level(
     manifest_hash: &String,
     attestation_hash: &String,
 ) -> VerificationLevel {
-    if storage_ref.len() > 0 && manifest_hash.len() > 0 && attestation_hash.len() > 0 {
+    if !storage_ref.is_empty() && !manifest_hash.is_empty() && !attestation_hash.is_empty() {
         VerificationLevel::Standard
     } else {
         VerificationLevel::Basic
@@ -663,7 +637,7 @@ fn creates_cycle(env: &Env, start_id: u64, target_id: u64) -> bool {
             .storage()
             .persistent()
             .get(&key)
-            .unwrap_or(Vec::new(&env));
+            .unwrap_or(Vec::new(env));
 
         let mut next: Option<u64> = None;
         for relation in links.iter() {
@@ -831,6 +805,13 @@ impl ProvenanceContract {
             .get(&certificate_id)
             .ok_or(ProvenanceError::CertificateNotFound)?;
 
+        if cert.locked {
+            return Err(ProvenanceError::CertificateLocked);
+        }
+        if cert.revoked {
+            return Err(ProvenanceError::AlreadyRevoked);
+        }
+
         cert.revoked = true;
         cert.revocation_reason = reason.clone();
         cert.revocation_timestamp = Some(env.ledger().timestamp());
@@ -903,7 +884,7 @@ impl ProvenanceContract {
 
         Ok(cert
             .expires_at
-            .map_or(false, |ts| env.ledger().timestamp() > ts))
+            .is_some_and(|ts| env.ledger().timestamp() > ts))
     }
 
     /// #177 — Renew an expired (or soon-to-expire) certificate with a new expiration
@@ -1231,12 +1212,7 @@ impl ProvenanceContract {
         env.storage().persistent().set(&history_key, &version_entry);
 
         // #181 — record in amendment history
-        Self::record_history(
-            &env,
-            certificate_id,
-            "metadata_updated",
-            owner.clone(),
-        );
+        Self::record_history(&env, certificate_id, "metadata_updated", owner.clone());
 
         MetadataUpdated {
             certificate_id,
@@ -1280,7 +1256,7 @@ impl ProvenanceContract {
         while i > 0 && count < limit {
             if let Some(cert) = env.storage().persistent().get::<u64, ProvenanceCert>(&i) {
                 // #177 — filter expired certificates out of default queries
-                let expired = cert.expires_at.map_or(false, |ts| now > ts);
+                let expired = cert.expires_at.is_some_and(|ts| now > ts);
                 if !expired && cert.timestamp >= start_time && cert.timestamp <= end_time {
                     if skipped >= offset {
                         results.push_back((i, cert));
@@ -1380,7 +1356,7 @@ impl ProvenanceContract {
         BatchMinted {
             owner: to,
             certificate_ids: certificate_ids.clone(),
-            count: certificate_ids.len() as u32,
+            count: certificate_ids.len(),
         }
         .publish(&env);
 
@@ -1646,7 +1622,7 @@ impl ProvenanceContract {
             .ok_or(ProvenanceError::CertificateNotFound)?;
         Self::current_owner(&env, certificate_id, &cert).require_auth();
 
-        if mime_type.len() == 0 {
+        if mime_type.is_empty() {
             return Err(ProvenanceError::InvalidMediaMetadata);
         }
 
@@ -1782,7 +1758,7 @@ impl ProvenanceContract {
             .persistent()
             .get(&coll_certs_key)
             .unwrap_or(Vec::new(&env));
-        if !coll_certs.contains(&certificate_id) {
+        if !coll_certs.contains(certificate_id) {
             coll_certs.push_back(certificate_id);
             env.storage().persistent().set(&coll_certs_key, &coll_certs);
         }
@@ -1793,7 +1769,7 @@ impl ProvenanceContract {
             .persistent()
             .get(&cert_colls_key)
             .unwrap_or(Vec::new(&env));
-        if !cert_colls.contains(&collection_id) {
+        if !cert_colls.contains(collection_id) {
             cert_colls.push_back(collection_id);
             env.storage().persistent().set(&cert_colls_key, &cert_colls);
         }
@@ -1911,11 +1887,11 @@ impl ProvenanceContract {
             return Err(ProvenanceError::CertificateLocked);
         }
 
-        if tag.len() as u32 > Self::MAX_TAG_LENGTH {
+        if tag.len() > Self::MAX_TAG_LENGTH {
             return Err(ProvenanceError::InvalidTagLength);
         }
 
-        if cert.tags.len() as u32 >= Self::MAX_TAGS_PER_CERTIFICATE {
+        if cert.tags.len() >= Self::MAX_TAGS_PER_CERTIFICATE {
             return Err(ProvenanceError::MaxTagsExceeded);
         }
 
@@ -1938,7 +1914,7 @@ impl ProvenanceContract {
             .persistent()
             .get(&tag_index_key)
             .unwrap_or(Vec::new(&env));
-        if !cert_ids.contains(&certificate_id) {
+        if !cert_ids.contains(certificate_id) {
             cert_ids.push_back(certificate_id);
             env.storage().persistent().set(&tag_index_key, &cert_ids);
         }
@@ -1992,7 +1968,7 @@ impl ProvenanceContract {
                 new_cert_ids.push_back(id);
             }
         }
-        if new_cert_ids.len() > 0 {
+        if !new_cert_ids.is_empty() {
             env.storage()
                 .persistent()
                 .set(&tag_index_key, &new_cert_ids);
@@ -2068,13 +2044,13 @@ impl ProvenanceContract {
             return Err(ProvenanceError::CertificateLocked);
         }
 
-        if new_tags.len() as u32 > Self::MAX_TAGS_PER_CERTIFICATE {
+        if new_tags.len() > Self::MAX_TAGS_PER_CERTIFICATE {
             return Err(ProvenanceError::MaxTagsExceeded);
         }
 
         // Validate all tags
         for tag in new_tags.iter() {
-            if tag.len() as u32 > Self::MAX_TAG_LENGTH {
+            if tag.len() > Self::MAX_TAG_LENGTH {
                 return Err(ProvenanceError::InvalidTagLength);
             }
         }
@@ -2093,7 +2069,7 @@ impl ProvenanceContract {
                     new_cert_ids.push_back(id);
                 }
             }
-            if new_cert_ids.len() > 0 {
+            if !new_cert_ids.is_empty() {
                 env.storage()
                     .persistent()
                     .set(&tag_index_key, &new_cert_ids);
@@ -2114,7 +2090,7 @@ impl ProvenanceContract {
                 .persistent()
                 .get(&tag_index_key)
                 .unwrap_or(Vec::new(&env));
-            if !cert_ids.contains(&certificate_id) {
+            if !cert_ids.contains(certificate_id) {
                 cert_ids.push_back(certificate_id);
                 env.storage().persistent().set(&tag_index_key, &cert_ids);
             }
@@ -2283,7 +2259,10 @@ impl ProvenanceContract {
     /// certificate's lifetime (manifest hash, verification level, revocation
     /// status, tags, expiration) together with the actor that last modified
     /// the certificate (tracked in the amendment history log).
-    pub fn take_snapshot(env: Env, certificate_id: u64) -> Result<ProvenanceCertSnapshot, ProvenanceError> {
+    pub fn take_snapshot(
+        env: Env,
+        certificate_id: u64,
+    ) -> Result<ProvenanceCertSnapshot, ProvenanceError> {
         let cert: ProvenanceCert = env
             .storage()
             .persistent()
@@ -2297,7 +2276,7 @@ impl ProvenanceContract {
             .get(&DataKey::History(certificate_id))
             .unwrap_or_else(|| Vec::new(&env));
 
-        let last_actor = if history.len() > 0 {
+        let last_actor = if !history.is_empty() {
             history.get_unchecked(history.len() - 1).modifier.clone()
         } else {
             cert.creator.clone()
@@ -2416,10 +2395,7 @@ impl ProvenanceContract {
 
         let owner = Self::current_owner(&env, certificate_id, &cert);
         // Allow owner or oracle to set the policy
-        let oracle: Option<Address> = env
-            .storage()
-            .persistent()
-            .get(&symbol_short!("ORACLE"));
+        let oracle: Option<Address> = env.storage().persistent().get(&symbol_short!("ORACLE"));
         if applied_by != owner {
             if let Some(oracle_addr) = oracle {
                 if applied_by != oracle_addr {
@@ -2451,10 +2427,7 @@ impl ProvenanceContract {
     }
 
     /// Approve a pending redaction policy (oracle/admin-gated).
-    pub fn approve_redaction_policy(
-        env: Env,
-        certificate_id: u64,
-    ) -> Result<(), ProvenanceError> {
+    pub fn approve_redaction_policy(env: Env, certificate_id: u64) -> Result<(), ProvenanceError> {
         let oracle: Address = env
             .storage()
             .persistent()
@@ -2482,10 +2455,7 @@ impl ProvenanceContract {
     }
 
     /// Retrieve the current redaction policy record for a certificate.
-    pub fn get_redaction_policy(
-        env: Env,
-        certificate_id: u64,
-    ) -> Option<RedactionPolicyRecord> {
+    pub fn get_redaction_policy(env: Env, certificate_id: u64) -> Option<RedactionPolicyRecord> {
         env.storage()
             .persistent()
             .get(&DataKey::RedactionPolicy(certificate_id))

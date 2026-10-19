@@ -4,7 +4,7 @@
 /// multi-sig governance, and event emission.
 #[cfg(test)]
 mod registry_integration_tests {
-    use registry::{RegistryContract, RegistryContractClient};
+    use crate::{RegistryContract, RegistryContractClient};
     use soroban_sdk::{
         testutils::{Address as _, Events, Ledger as _},
         Address, BytesN, Env,
@@ -44,10 +44,8 @@ mod registry_integration_tests {
         let (_, client) = setup(&env);
         let admin2 = Address::generate(&env);
         let provenance2 = Address::generate(&env);
-        let result = std::panic::catch_unwind(|| {
-            client.init(&admin2, &provenance2);
-        });
-        assert!(result.is_err(), "second init must panic");
+        let result = client.try_init(&admin2, &provenance2);
+        assert!(result.is_err(), "second init must be rejected");
     }
 
     // -----------------------------------------------------------------------
@@ -154,7 +152,7 @@ mod registry_integration_tests {
         client.add_provider(&provider_key);
         assert!(client.is_provider(&provider_key));
 
-        client.blacklist_provider(&provider_key);
+        client.blacklist_provider(&provider_key, &1u32);
 
         assert!(
             !client.is_provider(&provider_key),
@@ -190,7 +188,7 @@ mod registry_integration_tests {
         let env = make_env();
         let (_, client) = setup(&env);
 
-        let hashes: Vec<BytesN<32>> = (1u8..=5).map(|b| hash(&env, b)).collect();
+        let hashes: [BytesN<32>; 5] = [1u8, 2, 3, 4, 5].map(|b| hash(&env, b));
         for h in &hashes {
             client.add_tee_hash(h);
         }

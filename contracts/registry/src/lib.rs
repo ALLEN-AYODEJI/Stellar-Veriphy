@@ -1,5 +1,3 @@
-#![no_std]
-use soroban_sdk::{contract, contractimpl, Bytes, Env, Symbol};
 //! # StellarVeriphy — Registry Contract
 //!
 //! Maintains the on-chain registry of:
@@ -70,6 +68,8 @@ mod provenance {
         pub version: u32,
     }
 
+    // Only the generated `ProvenanceClient` is used; the trait itself is never named.
+    #[allow(dead_code)]
     #[contractclient(name = "ProvenanceClient")]
     pub trait ProvenanceContract {
         fn mint(
@@ -425,12 +425,15 @@ impl RegistryContract {
     pub fn register(env: Env, admin: soroban_sdk::Address, code_hash: Bytes) {
         admin.require_auth();
         env.storage().persistent().set(&code_hash, &true);
-        env.events().publish((Symbol::new(&env, "registered"),), code_hash);
+        env.events()
+            .publish((Symbol::new(&env, "registered"),), code_hash);
     }
 
     /// Check if a TEE code hash is approved.
     pub fn is_approved(env: Env, code_hash: Bytes) -> bool {
         env.storage().persistent().get(&code_hash).unwrap_or(false)
+    }
+
     /// One-time initialisation.
     pub fn init(env: Env, admin: Address, provenance: Address) {
         if env.storage().instance().has(&DataKey::Admin) {
@@ -488,7 +491,9 @@ impl RegistryContract {
     /// Register an approved TEE code hash with a 180-day validity window.  #22 #23 #191
     pub fn add_tee_hash(env: Env, code_hash: BytesN<32>) {
         Self::require_admin(&env);
-        Self::add_tee_hash_internal(&env, code_hash);
+        Self::add_tee_hash_internal(&env, code_hash.clone());
+        env.events()
+            .publish((Symbol::new(&env, "tee_hash_added"),), code_hash);
     }
 
     // Shared storage-writing logic for `add_tee_hash`, factored out so
@@ -722,9 +727,9 @@ impl RegistryContract {
                 &ProviderInfo {
                     tier: ServiceTier::Basic,
                     status: ProviderStatus::Active,
-                    name: String::from_str(&env, ""),
+                    name: String::from_str(env, ""),
                     website: None,
-                    description: String::from_str(&env, ""),
+                    description: String::from_str(env, ""),
                 },
             );
             let mut list: Vec<BytesN<32>> = env
@@ -765,6 +770,14 @@ impl RegistryContract {
             .get(&DataKey::Provider(provider.clone()))
             .unwrap_or(false);
         if !registered {
+            return false;
+        }
+        // A blacklisted provider is never considered valid until whitelisted again.
+        if env
+            .storage()
+            .persistent()
+            .has(&DataKey::ProviderBlacklist(provider.clone()))
+        {
             return false;
         }
         let info: Option<ProviderInfo> = env
@@ -1617,7 +1630,7 @@ impl RegistryContract {
             .get(&DataKey::ProposalApprovals(proposal_id))
             .unwrap_or(Vec::new(&env));
 
-        if (approvals.len() as u32) < threshold {
+        if approvals.len() < threshold {
             return Err(Error::InsufficientApprovals);
         }
 
@@ -1910,7 +1923,7 @@ impl RegistryContract {
                 .persistent()
                 .get(&DataKey::ProviderGroups(provider.clone()))
                 .unwrap_or(Vec::new(&env));
-            if !groups.contains(&group_id) {
+            if !groups.contains(group_id) {
                 groups.push_back(group_id);
                 env.storage()
                     .persistent()
