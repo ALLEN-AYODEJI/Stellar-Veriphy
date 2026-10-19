@@ -26,11 +26,11 @@ Before touching anything, add an entry to `docs/operations/deployment-log.md` wi
 
 ```bash
 ./scripts/snapshot-contract-state.sh <contract>
-git add docs/operations/storage-keys-<contract>.txt docs/operations/struct-snapshot-<contract>.txt
+git add docs/operations/storage-keys-<contract>.txt docs/operations/struct-snapshot-<contract>.txt docs/operations/api-<contract>.txt
 git commit -m "chore: pre-upgrade snapshot for <contract>"
 ```
 
-This captures all `DataKey` variants and struct field signatures so the safety check script can diff against them.
+This captures the `DataKey` variants, the persisted struct fields and the public entry points, so the safety check can diff against them. Run it against the **currently-deployed** version. A snapshot of unreleased code does not describe what live data and consumers depend on. Missing baselines fail the check. They are never skipped.
 
 ### Step 3 — Write a migration plan
 
@@ -42,7 +42,26 @@ Copy `docs/operations/migration-template.md` to `docs/operations/migration-<cont
 ./scripts/upgrade-safety-check.sh <contract> <old_wasm_path> <new_wasm_path> testnet
 ```
 
-All checks must pass before proceeding. Fix any failures the script reports — they are not advisory for mainnet. Common failures and their fixes:
+All checks must pass before proceeding. Fix any failures the script reports — they are not advisory for mainnet.
+
+The checker flags a change as **RISK** when it could break live data or existing callers:
+
+| RISK | Why it matters |
+|------|----------------|
+| A removed `DataKey` variant | Data stored under that key becomes unreachable. |
+| A removed or changed persisted struct field | Existing entries may not deserialise. |
+| A new required (non-`Option`) struct field | Existing entries lack the field and must be migrated. |
+| A removed public entry point | Clients that call it fail. |
+
+Every RISK must be named in the migration doc, using the exact token the checker prints (for example `DataKey::Old`, `ProviderInfo.field` or `fn old_entry`). A RISK with no migration doc blocks the upgrade on testnet too. A new `Option` field is reported as information, not a risk.
+
+The tooling has its own self-test. It covers each failure class above and runs without building a contract:
+
+```bash
+make upgrade-selftest        # or: pnpm test:upgrade-safety
+```
+
+Common failures and their fixes:
 
 | Failure | Fix |
 |---------|-----|

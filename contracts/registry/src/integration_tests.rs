@@ -4,10 +4,10 @@
 /// multi-sig governance, and event emission.
 #[cfg(test)]
 mod registry_integration_tests {
-    use registry::{RegistryContract, RegistryContractClient};
+    use crate::{RegistryContract, RegistryContractClient};
     use soroban_sdk::{
         testutils::{Address as _, Events, Ledger as _},
-        Address, BytesN, Env,
+        Address, BytesN, Env, Vec,
     };
 
     // -----------------------------------------------------------------------
@@ -44,9 +44,7 @@ mod registry_integration_tests {
         let (_, client) = setup(&env);
         let admin2 = Address::generate(&env);
         let provenance2 = Address::generate(&env);
-        let result = std::panic::catch_unwind(|| {
-            client.init(&admin2, &provenance2);
-        });
+        let result = client.try_init(&admin2, &provenance2);
         assert!(result.is_err(), "second init must panic");
     }
 
@@ -152,13 +150,14 @@ mod registry_integration_tests {
         let provider_key = hash(&env, 0x20);
 
         client.add_provider(&provider_key);
-        assert!(client.is_provider(&provider_key));
+        assert!(client.is_provider_authorized(&provider_key));
 
-        client.blacklist_provider(&provider_key);
+        client.blacklist_provider(&provider_key, &1u32);
 
+        assert!(client.is_blacklisted(&provider_key));
         assert!(
-            !client.is_provider(&provider_key),
-            "blacklisted provider must not be approved"
+            client.try_is_provider_authorized(&provider_key).is_err(),
+            "blacklisted provider must not be authorized"
         );
     }
 
@@ -190,23 +189,26 @@ mod registry_integration_tests {
         let env = make_env();
         let (_, client) = setup(&env);
 
-        let hashes: Vec<BytesN<32>> = (1u8..=5).map(|b| hash(&env, b)).collect();
-        for h in &hashes {
-            client.add_tee_hash(h);
+        let mut hashes = Vec::new(&env);
+        for b in 1u8..=5 {
+            hashes.push_back(hash(&env, b));
+        }
+        for i in 0..hashes.len() {
+            client.add_tee_hash(&hashes.get(i).unwrap());
         }
 
-        for h in &hashes {
+        for i in 0..hashes.len() {
             assert!(
-                client.is_tee_hash_approved(h),
+                client.is_tee_hash_approved(&hashes.get(i).unwrap()),
                 "every registered hash must be approved"
             );
         }
 
         // Rotating hash 0x01 must not affect 0x02..0x05
-        client.rotate_tee_hash(&hashes[0], &hash(&env, 0xAA));
-        for h in hashes.iter().skip(1) {
+        client.rotate_tee_hash(&hashes.get(0).unwrap(), &hash(&env, 0xAA));
+        for i in 1..hashes.len() {
             assert!(
-                client.is_tee_hash_approved(h),
+                client.is_tee_hash_approved(&hashes.get(i).unwrap()),
                 "non-rotated hashes must remain approved"
             );
         }

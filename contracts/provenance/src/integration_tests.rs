@@ -4,7 +4,11 @@
 /// and lock. Validates storage mutations and event emission at each step.
 #[cfg(test)]
 mod provenance_integration_tests {
-    use provenance::{
+    extern crate std;
+    use std::format;
+    use std::string::ToString;
+
+    use crate::{
         CertificateRollbackRecord, ProvenanceContract, ProvenanceContractClient, ProvenanceError,
         RevocationReason, RollbackReason,
     };
@@ -152,7 +156,10 @@ mod provenance_integration_tests {
         client.revoke_certificate(&id, &RevocationReason::LegalRequirement);
 
         let second = client.try_revoke_certificate(&id, &RevocationReason::CreatorRequest);
-        assert!(second.is_err(), "revoking an already-revoked cert must fail");
+        assert!(
+            second.is_err(),
+            "revoking an already-revoked cert must fail"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -169,7 +176,7 @@ mod provenance_integration_tests {
 
         let id = mint_one(&env, &client, "xfr", &original_owner);
 
-        client.transfer_certificate(&id, &original_owner, &new_owner);
+        client.transfer_certificate(&id, &new_owner);
 
         let owner_after = client.get_owner(&id);
         assert_eq!(
@@ -230,7 +237,10 @@ mod provenance_integration_tests {
             &RollbackReason::CreatorRequest,
         );
 
-        assert!(rollback_id_2 > rollback_id_1, "rollback ids must be monotonic");
+        assert!(
+            rollback_id_2 > rollback_id_1,
+            "rollback ids must be monotonic"
+        );
 
         let history = client.get_rollback_history(&id);
         assert_eq!(history.len(), 2, "both rollback records must be stored");

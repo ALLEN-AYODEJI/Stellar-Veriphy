@@ -35,3 +35,18 @@ export function errorMessage(err: unknown): string {
 export function isRetryable(err: unknown): boolean {
   return !(err instanceof JobError) || err.retryable;
 }
+
+/** Errors above this length are truncated in logs; the full message stays in the job's error history. */
+const LOG_MESSAGE_MAX = 500;
+
+/**
+ * Standard failure fields for every job log line, so failed jobs of any type can be grouped and
+ * correlated with the same keys: `errorCode` (metric-safe), `error` (truncated message), `retryable`.
+ */
+export function describeError(err: unknown): { errorCode: string; error: string; retryable: boolean } {
+  return {
+    errorCode: errorCode(err),
+    error: errorMessage(err).slice(0, LOG_MESSAGE_MAX),
+    retryable: isRetryable(err),
+  };
+}

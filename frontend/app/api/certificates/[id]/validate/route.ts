@@ -3,11 +3,11 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(
   _request: NextRequest,
-  { params }: { params: { certificateId: string } },
+  { params }: { params: { id: string } }
 ): Promise<NextResponse<ApiResponse<CertificateValidation>>> {
   try {
     const validation: CertificateValidation = {
-      certificateId: params.certificateId,
+      certificateId: params.id,
       isValid: true,
       creator: "GBXYZ123456789ABCDEF012345678901234567890",
       createdAt: Date.now() - 86400000,
@@ -24,7 +24,7 @@ export async function POST(
   } catch (error) {
     return NextResponse.json(
       { success: false, error: "Failed to validate certificate" },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }

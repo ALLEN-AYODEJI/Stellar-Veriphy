@@ -29,7 +29,10 @@
 import { create } from "zustand";
 import { subscribeWithSelector } from "zustand/middleware";
 
+import { CONTRACT_ADDRESSES } from "@/config/network";
+import { APP_NETWORK_PASSPHRASE, networkLabel } from "@/lib/network/chainCompatibility";
 import { auditLogger } from "@/lib/security/auditLogger";
+import { checkSignerCompatibility, checkTransactionTarget } from "@/lib/wallet/signerCompatibility";
 import { safeIsWalletAvailable } from "@/lib/walletDetection";
 import {
   ALL_ADAPTERS,
@@ -84,21 +87,11 @@ function friendlyConnectError(e: unknown, walletName: string): string {
   return raw || `Couldn't connect to ${walletName}. Please try again.`;
 }
 
-/** App's expected network, from the same env var the adapters already fall back to. */
-const EXPECTED_NETWORK_PASSPHRASE = process.env.NEXT_PUBLIC_NETWORK_PASSPHRASE;
-
-function networkLabel(passphrase: string): string {
-  return passphrase.includes("Public Global") ? "Mainnet" : "Testnet";
-}
-
 /** Returns a human-readable mismatch message, or null when the network matches (or nothing is configured to compare against). */
-function networkMismatchError(
-  details: WalletNetworkDetails,
-  walletName: string
-): string | null {
-  if (!EXPECTED_NETWORK_PASSPHRASE) return null;
-  if (details.networkPassphrase === EXPECTED_NETWORK_PASSPHRASE) return null;
-  return `${walletName} is connected to ${networkLabel(details.networkPassphrase)}, but this app expects ${networkLabel(EXPECTED_NETWORK_PASSPHRASE)}. Switch ${walletName}'s network, then reconnect.`;
+function networkMismatchError(details: WalletNetworkDetails, walletName: string): string | null {
+  if (!APP_NETWORK_PASSPHRASE) return null;
+  if (details.networkPassphrase === APP_NETWORK_PASSPHRASE) return null;
+  return `${walletName} is connected to ${networkLabel(details.networkPassphrase)}, but this app expects ${networkLabel(APP_NETWORK_PASSPHRASE)}. Switch ${walletName}'s network, then reconnect.`;
 }
 
 // ---------------------------------------------------------------------------
@@ -311,20 +304,56 @@ export const useWalletStore = create<WalletStore>()(
       // ── signTx ────────────────────────────────────────────────────────────
 
       signTx: async (xdr: string): Promise<string> => {
-        const { adapter, publicKey, network } = get();
+        const { adapter, publicKey } = get();
         if (!adapter || !publicKey) throw new Error("Wallet not connected");
+
+        // Read the wallet's current account and network rather than the polled
+        // copy, so a switch made since the last poll is caught before signing.
+        const walletAddress = await adapter.getAddress().catch(() => null);
+        const liveNetwork = await adapter.getNetwork().catch(() => null);
+        const issues = [
+          ...checkSignerCompatibility({
+            connectedAddress: publicKey,
+            walletAddress,
+            network: liveNetwork,
+            walletName: adapter.name,
+            feature: "transaction-signing",
+            appPassphrase: APP_NETWORK_PASSPHRASE,
+          }),
+        ];
+        if (liveNetwork) {
+          issues.push(
+            ...checkTransactionTarget({
+              xdr,
+              networkPassphrase: liveNetwork.networkPassphrase,
+              allowedContractIds: Object.values(CONTRACT_ADDRESSES),
+            })
+          );
+        }
+        if (issues.length > 0 || !liveNetwork) {
+          void auditLogger.logEvent({
+            actor: publicKey,
+            category: "contract",
+            action: "signer compatibility check failed",
+            severity: "warning",
+            details: `${adapter.name}: ${issues.map((issue) => issue.code).join(", ")}`,
+          });
+          throw new Error(issues.map((issue) => issue.message).join(" "));
+        }
+
+        set({ network: liveNetwork });
 
         try {
           const signed = await adapter.signTransaction(
             xdr,
-            network?.networkPassphrase ?? "",
+            liveNetwork.networkPassphrase,
             publicKey
           );
           void auditLogger.logEvent({
             actor: publicKey,
             category: "contract",
             action: "transaction signed",
-            details: `Network: ${network?.network ?? "unknown"}`,
+            details: `Network: ${liveNetwork.network}`,
           });
           return signed;
         } catch (e) {

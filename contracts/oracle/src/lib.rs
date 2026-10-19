@@ -1,12 +1,4 @@
 #![no_std]
-use soroban_sdk::{contract, contractimpl, contracttype, Bytes, Env, Symbol};
-
-#[contracttype]
-pub struct VerificationRequest {
-    pub storage_ref: Bytes,
-    pub manifest_hash: Bytes,
-    pub requester: soroban_sdk::Address,
-}
 
 //! # StellarVeriphy — Oracle Contract
 //!
@@ -506,21 +498,6 @@ pub struct OracleContract;
 
 #[contractimpl]
 impl OracleContract {
-    /// Submit a new verification request.
-    pub fn submit(env: Env, storage_ref: Bytes, manifest_hash: Bytes, requester: soroban_sdk::Address) -> u64 {
-        requester.require_auth();
-        let id: u64 = env.ledger().sequence() as u64;
-        let req = VerificationRequest { storage_ref, manifest_hash, requester };
-        env.storage().persistent().set(&id, &req);
-        env.events().publish((Symbol::new(&env, "submitted"),), id);
-        id
-    }
-
-    /// Retrieve a verification request by ID.
-    pub fn get(env: Env, id: u64) -> VerificationRequest {
-        env.storage().persistent().get(&id).unwrap()
-    }
-}
     // -----------------------------------------------------------------------
     // Initialisation
     // -----------------------------------------------------------------------
@@ -877,7 +854,7 @@ impl OracleContract {
             .get(&DataKey::ProviderList)
             .unwrap_or(vec![&env]);
 
-        if list.len() == 0 {
+        if list.is_empty() {
             return Err(Error::NoAvailableProvider);
         }
 
@@ -894,10 +871,10 @@ impl OracleContract {
             .get(&DataKey::RoundRobinIndex)
             .unwrap_or(0u32);
 
-        let len = list.len() as u32;
+        let len = list.len();
 
         for offset in 0..len {
-            let idx = ((rr_start + offset) % len) as u32;
+            let idx = (rr_start + offset) % len;
             let provider = list.get(idx).unwrap();
 
             // Skip if not registered
@@ -1510,7 +1487,7 @@ impl OracleContract {
         if start >= all_ids.len() {
             return PaginatedRequests {
                 requests: results,
-                total_count: all_ids.len() as u32,
+                total_count: all_ids.len(),
             };
         }
 
@@ -1539,7 +1516,7 @@ impl OracleContract {
 
         PaginatedRequests {
             requests: results,
-            total_count: all_ids.len() as u32,
+            total_count: all_ids.len(),
         }
     }
 
@@ -2232,7 +2209,10 @@ impl OracleContract {
     /// Computes a trust score for a provider from on-chain state: smoothed
     /// verification outcomes, dispute history, SLA compliance and stake.
     /// Suspended providers are heavily penalised.
-    pub fn get_provider_trust_score(env: Env, provider: Address) -> Result<ProviderTrustScore, Error> {
+    pub fn get_provider_trust_score(
+        env: Env,
+        provider: Address,
+    ) -> Result<ProviderTrustScore, Error> {
         if !Self::is_provider(env.clone(), provider.clone()) {
             return Err(Error::ProviderNotRegistered);
         }
@@ -2369,3 +2349,7 @@ mod test;
 // event emission, and error paths across the oracle contract.
 #[cfg(test)]
 mod integration_tests;
+
+// #807 — repeatable cost benchmark for the most-used calls. Run via scripts/benchmark-contracts.mjs.
+#[cfg(test)]
+mod benchmark;

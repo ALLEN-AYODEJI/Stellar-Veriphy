@@ -1,19 +1,23 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
 import type {
   ProvenanceExportFormat,
   ProvenanceExportMeta,
   ProvenanceRecord,
 } from "@stellarveriphy/shared/types";
 import {
-  PROVENANCE_EXPORT_SCHEMA_VERSION,
   buildExportFileName,
   chunkRecords,
   exportMimeType,
+  PROVENANCE_EXPORT_DEFAULT_LIMIT,
+  PROVENANCE_EXPORT_LIMIT_OPTIONS,
+  PROVENANCE_EXPORT_SCHEMA_VERSION,
   serializeRecords,
+  validateExportLimit,
   validateRecords,
 } from "@stellarveriphy/shared/utils/provenanceExport";
+import { useMemo, useRef, useState } from "react";
+
 import { useWallet } from "@/context/WalletContext";
 import { resolveExportRole } from "@/lib/provenance/access";
 
@@ -55,6 +59,7 @@ export function BulkExportPanel({ records }: BulkExportPanelProps) {
   const [status, setStatus] = useState<"all" | ProvenanceRecord["status"]>("all");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
+  const [limit, setLimit] = useState<number>(PROVENANCE_EXPORT_DEFAULT_LIMIT);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [queue, setQueue] = useState<ExportQueueItem[]>([]);
   const [isPreparing, setIsPreparing] = useState(false);
@@ -123,6 +128,11 @@ export function BulkExportPanel({ records }: BulkExportPanelProps) {
 
   const handleExport = () => {
     if (preparingRef.current) return;
+    const limitError = validateExportLimit(selected.length, limit);
+    if (limitError) {
+      setValidationError(limitError);
+      return;
+    }
     const errors = validateRecords(selected);
     if (errors.length) {
       setValidationError(
@@ -225,11 +235,31 @@ export function BulkExportPanel({ records }: BulkExportPanelProps) {
           Minted to
           <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className={inputCls} />
         </label>
+        <label className="text-sm text-gray-700 dark:text-gray-300">
+          Record limit per export
+          <select
+            value={limit}
+            onChange={(e) => setLimit(Number(e.target.value))}
+            aria-describedby="export-limit-hint"
+            className={inputCls}
+          >
+            {PROVENANCE_EXPORT_LIMIT_OPTIONS.map((option) => (
+              <option key={option} value={option}>
+                {option.toLocaleString()} records
+              </option>
+            ))}
+          </select>
+        </label>
       </div>
+      <p id="export-limit-hint" className={`text-xs ${selected.length > limit ? "text-red-700 dark:text-red-400" : "text-gray-500 dark:text-gray-400"}`}>
+        {selected.length > limit
+          ? `${selected.length.toLocaleString()} records match, above the ${limit.toLocaleString()} limit. Narrow the filters or raise the limit before exporting.`
+          : `${selected.length.toLocaleString()} records match. Each export must stay within the selected limit.`}
+      </p>
       <div className="flex flex-wrap items-center gap-4">
         <button
           onClick={handleExport}
-          disabled={isPreparing || selected.length === 0}
+          disabled={isPreparing || selected.length === 0 || selected.length > limit}
           className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {isPreparing

@@ -41,7 +41,11 @@ export function RouteScrollRestoration() {
 
     const frame = window.requestAnimationFrame(() => {
       const savedPosition = returningRef.current ? readPositions()[pathname] : undefined;
-      window.scrollTo({ top: typeof savedPosition === "number" ? savedPosition : 0, left: 0, behavior: "auto" });
+      window.scrollTo({
+        top: typeof savedPosition === "number" ? savedPosition : 0,
+        left: 0,
+        behavior: "auto",
+      });
       returningRef.current = false;
     });
 
@@ -58,4 +62,3 @@ export function RouteScrollRestoration() {
 }
 
 export default RouteScrollRestoration;
-***

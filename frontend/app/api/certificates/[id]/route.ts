@@ -10,24 +10,21 @@ function getStoredCertificates(): CertificateDetails[] {
 
 export async function GET(
   _request: NextRequest,
-  { params }: { params: { certificateId: string } },
+  { params }: { params: { id: string } }
 ): Promise<NextResponse<ApiResponse<CertificateDetails>>> {
   try {
     const certificates = getStoredCertificates();
-    const certificate = certificates.find((c) => c.id === params.certificateId);
+    const certificate = certificates.find((c) => c.id === params.id);
 
     if (!certificate) {
-      return NextResponse.json(
-        { success: false, error: "Certificate not found" },
-        { status: 404 },
-      );
+      return NextResponse.json({ success: false, error: "Certificate not found" }, { status: 404 });
     }
 
     return NextResponse.json({ success: true, data: certificate });
   } catch (error) {
     return NextResponse.json(
       { success: false, error: "Failed to fetch certificate" },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }

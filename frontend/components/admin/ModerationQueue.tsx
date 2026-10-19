@@ -8,27 +8,29 @@
  * Every transition is auditable — nothing is silently accepted or dismissed.
  */
 
-import { useCallback, useEffect, useState } from "react";
-import { cardGridClassName } from "@/components/ui/CardGrid";
 import type {
   ModerationQueueItem,
   ModerationQueueSummary,
   ModerationStatus,
 } from "@stellarveriphy/shared";
+import { useCallback, useEffect, useState } from "react";
+
 import DisputeAuditTrail from "@/components/DisputeAuditTrail";
 import { formatDateTime } from "@/utils/formatDateTime";
+import { cardGridClassName } from "@/components/ui/CardGrid";
+import { type MessageKey,t } from "@/lib/i18n";
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-const STATUS_LABELS: Record<ModerationStatus, string> = {
-  pending: "Pending",
-  under_review: "Under Review",
-  approved: "Approved",
-  rejected: "Rejected",
-  escalated: "Escalated",
-  resolved: "Resolved",
+const STATUS_LABEL_KEYS: Record<ModerationStatus, MessageKey> = {
+  pending: "admin.moderation.status.pending",
+  under_review: "admin.moderation.status.under_review",
+  approved: "admin.moderation.status.approved",
+  rejected: "admin.moderation.status.rejected",
+  escalated: "admin.moderation.status.escalated",
+  resolved: "admin.moderation.status.resolved",
 };
 
 const STATUS_COLORS: Record<ModerationStatus, string> = {
@@ -45,7 +47,7 @@ function StatusBadge({ status }: { status: ModerationStatus }) {
     <span
       className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${STATUS_COLORS[status]}`}
     >
-      {STATUS_LABELS[status]}
+      {t(STATUS_LABEL_KEYS[status])}
     </span>
   );
 }
@@ -110,10 +112,10 @@ function ItemDetailPanel({
         onUpdate(data.data);
         onClose();
       } else {
-        setError(data.error ?? "Failed to save.");
+        setError(data.error ?? t("admin.moderation.detail.saveError"));
       }
     } catch {
-      setError("Network error.");
+      setError(t("admin.common.networkError"));
     } finally {
       setSaving(false);
     }
@@ -130,13 +132,13 @@ function ItemDetailPanel({
         <div className="flex items-start justify-between gap-2">
           <div>
             <h2 id="mod-detail-title" className="text-base font-semibold text-gray-900 dark:text-gray-100">
-              Moderation Review
+              {t("admin.moderation.detail.title")}
             </h2>
             <p className="text-xs font-mono text-gray-400 mt-0.5">{item.id}</p>
           </div>
           <button
             onClick={onClose}
-            aria-label="Close"
+            aria-label={t("admin.common.close")}
             className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xl leading-none"
           >
             ×
@@ -145,23 +147,23 @@ function ItemDetailPanel({
 
         {/* Asset info */}
         <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-          <dt className="text-gray-500 dark:text-gray-400">Asset ID</dt>
+          <dt className="text-gray-500 dark:text-gray-400">{t("admin.moderation.detail.assetId")}</dt>
           <dd className="font-mono text-gray-900 dark:text-gray-100 truncate">{item.assetId}</dd>
-          <dt className="text-gray-500 dark:text-gray-400">Content Hash</dt>
+          <dt className="text-gray-500 dark:text-gray-400">{t("admin.moderation.detail.contentHash")}</dt>
           <dd className="font-mono text-gray-900 dark:text-gray-100 truncate text-xs">{item.contentHash}</dd>
-          <dt className="text-gray-500 dark:text-gray-400">Trigger</dt>
+          <dt className="text-gray-500 dark:text-gray-400">{t("admin.moderation.detail.trigger")}</dt>
           <dd className="text-gray-900 dark:text-gray-100 capitalize">{item.trigger.replace(/_/g, " ")}</dd>
-          <dt className="text-gray-500 dark:text-gray-400">Reported by</dt>
+          <dt className="text-gray-500 dark:text-gray-400">{t("admin.moderation.detail.reportedBy")}</dt>
           <dd className="font-mono text-gray-900 dark:text-gray-100 truncate text-xs">
             {item.reportedBy ?? <span className="text-gray-400 not-italic">—</span>}
           </dd>
-          <dt className="text-gray-500 dark:text-gray-400">Current status</dt>
+          <dt className="text-gray-500 dark:text-gray-400">{t("admin.moderation.detail.currentStatus")}</dt>
           <dd><StatusBadge status={item.status} /></dd>
         </dl>
 
         {/* Summary */}
         <div>
-          <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Summary</p>
+          <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("admin.moderation.detail.summary")}</p>
           <p className="text-sm text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-700/50 rounded p-3">
             {item.summary}
           </p>
@@ -170,7 +172,7 @@ function ItemDetailPanel({
         {/* Evidence */}
         {item.evidence && item.evidence.length > 0 && (
           <div>
-            <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Evidence</p>
+            <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("admin.moderation.detail.evidence")}</p>
             <ul className="list-disc list-inside text-xs text-gray-600 dark:text-gray-400 space-y-0.5">
               {item.evidence.map((e, i) => (
                 <li key={i}>{e}</li>
@@ -183,13 +185,13 @@ function ItemDetailPanel({
           href={`/admin/moderation/${item.id}/evidence`}
           className="inline-flex items-center text-sm font-medium text-blue-600 hover:underline dark:text-blue-400"
         >
-          Open full evidence package →
+          {t("admin.moderation.detail.openEvidence")}
         </a>
 
         {/* Escalation chain */}
         {item.escalationChain && item.escalationChain.length > 0 && (
           <div>
-            <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Escalation Chain</p>
+            <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("admin.moderation.detail.escalationChain")}</p>
             <ol className="text-xs font-mono text-gray-500 dark:text-gray-400 space-y-0.5">
               {item.escalationChain.map((addr, i) => (
                 <li key={i}>{i + 1}. {addr}</li>
@@ -204,7 +206,7 @@ function ItemDetailPanel({
         <div className="space-y-3">
           <div>
             <label htmlFor="mod-status" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Update status
+              {t("admin.moderation.detail.updateStatus")}
             </label>
             <select
               id="mod-status"
@@ -212,15 +214,15 @@ function ItemDetailPanel({
               onChange={(e) => setNewStatus(e.target.value as ModerationStatus)}
               className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 outline-none"
             >
-              {(Object.keys(STATUS_LABELS) as ModerationStatus[]).map((s) => (
-                <option key={s} value={s}>{STATUS_LABELS[s]}</option>
+              {(Object.keys(STATUS_LABEL_KEYS) as ModerationStatus[]).map((s) => (
+                <option key={s} value={s}>{t(STATUS_LABEL_KEYS[s])}</option>
               ))}
             </select>
           </div>
 
           <div>
             <label htmlFor="mod-notes" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Review notes
+              {t("admin.moderation.detail.reviewNotes")}
             </label>
             <textarea
               id="mod-notes"
@@ -228,20 +230,20 @@ function ItemDetailPanel({
               onChange={(e) => setNotes(e.target.value)}
               rows={3}
               className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 outline-none resize-none"
-              placeholder="Document your decision reasoning…"
+              placeholder={t("admin.moderation.detail.notesPlaceholder")}
             />
           </div>
 
           <div>
             <label htmlFor="mod-escalate" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Escalate to (Stellar address, optional)
+              {t("admin.moderation.detail.escalateTo")}
             </label>
             <input
               id="mod-escalate"
               type="text"
               value={escalateTo}
               onChange={(e) => setEscalateTo(e.target.value)}
-              placeholder="G…"
+              placeholder={t("admin.moderation.detail.escalatePlaceholder")}
               className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 font-mono focus:ring-2 focus:ring-blue-500 outline-none"
             />
           </div>
@@ -256,14 +258,14 @@ function ItemDetailPanel({
             onClick={onClose}
             className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
           >
-            Cancel
+            {t("admin.moderation.detail.cancel")}
           </button>
           <button
             onClick={handleSave}
             disabled={saving}
             className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors"
           >
-            {saving ? "Saving…" : "Save decision"}
+            {saving ? t("admin.moderation.detail.saving") : t("admin.moderation.detail.save")}
           </button>
         </div>
 
@@ -314,10 +316,10 @@ export function ModerationQueue({ defaultStatusFilter }: Props) {
         setItems(data.data.items);
         setSummary(data.data.summary);
       } else {
-        setError(data.error ?? "Failed to load queue.");
+        setError(data.error ?? t("admin.moderation.error.load"));
       }
     } catch {
-      setError("Network error loading moderation queue.");
+      setError(t("admin.moderation.error.network"));
     } finally {
       setLoading(false);
     }
@@ -340,19 +342,19 @@ export function ModerationQueue({ defaultStatusFilter }: Props) {
     <div className="space-y-6">
       {/* Summary cards */}
       <div className={cardGridClassName("summary")}>
-        <SummaryCard label="Total" value={summary.total} />
+        <SummaryCard label={t("admin.moderation.summary.total")} value={summary.total} />
         <SummaryCard
-          label="Pending"
+          label={t("admin.moderation.summary.pending")}
           value={summary.pending}
           accent="text-yellow-600 dark:text-yellow-400"
         />
         <SummaryCard
-          label="Under review"
+          label={t("admin.moderation.summary.underReview")}
           value={summary.underReview}
           accent="text-blue-600 dark:text-blue-400"
         />
         <SummaryCard
-          label="Escalated"
+          label={t("admin.moderation.summary.escalated")}
           value={summary.escalated}
           accent="text-orange-600 dark:text-orange-400"
         />
@@ -361,7 +363,7 @@ export function ModerationQueue({ defaultStatusFilter }: Props) {
       {/* Filter bar */}
       <div className="flex items-center gap-3 flex-wrap">
         <label htmlFor="mod-filter" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-          Filter by status:
+          {t("admin.moderation.filter.label")}
         </label>
         <select
           id="mod-filter"
@@ -369,9 +371,9 @@ export function ModerationQueue({ defaultStatusFilter }: Props) {
           onChange={(e) => setStatusFilter(e.target.value)}
           className="rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-1.5 text-sm text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 outline-none"
         >
-          <option value="">All statuses</option>
-          {(Object.keys(STATUS_LABELS) as ModerationStatus[]).map((s) => (
-            <option key={s} value={s}>{STATUS_LABELS[s]}</option>
+          <option value="">{t("admin.moderation.filter.allStatuses")}</option>
+          {(Object.keys(STATUS_LABEL_KEYS) as ModerationStatus[]).map((s) => (
+            <option key={s} value={s}>{t(STATUS_LABEL_KEYS[s])}</option>
           ))}
         </select>
         <button
@@ -379,7 +381,7 @@ export function ModerationQueue({ defaultStatusFilter }: Props) {
           disabled={loading}
           className="ml-auto px-3 py-1.5 text-sm font-medium rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 transition-colors"
         >
-          {loading ? "Refreshing…" : "Refresh"}
+          {loading ? t("admin.moderation.filter.refreshing") : t("admin.moderation.filter.refresh")}
         </button>
       </div>
 
@@ -393,15 +395,15 @@ export function ModerationQueue({ defaultStatusFilter }: Props) {
       {/* Queue table */}
       {!loading && items.length === 0 && !error && (
         <div className="text-center py-12 text-gray-500 dark:text-gray-400">
-          <p className="text-lg font-medium">Queue is empty</p>
-          <p className="text-sm mt-1">No items match the current filter.</p>
+          <p className="text-lg font-medium">{t("admin.moderation.empty.heading")}</p>
+          <p className="text-sm mt-1">{t("admin.moderation.empty.body")}</p>
         </div>
       )}
 
       {items.length > 0 && (
         <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-left" aria-label="Moderation queue">
+            <table className="w-full text-left" aria-label={t("admin.moderation.table.label")}>
               <thead>
                 <tr className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-700">
                   <th className="px-4 py-3">Asset</th>
@@ -410,6 +412,11 @@ export function ModerationQueue({ defaultStatusFilter }: Props) {
                   <th className="px-4 py-3">Created</th>
                   <th className="px-4 py-3">Last updated</th>
                   <th className="px-4 py-3 text-right">Actions</th>
+                  <th className="px-4 py-3">{t("admin.moderation.table.asset")}</th>
+                  <th className="px-4 py-3">{t("admin.moderation.table.trigger")}</th>
+                  <th className="px-4 py-3">{t("admin.moderation.table.status")}</th>
+                  <th className="px-4 py-3">{t("admin.moderation.table.created")}</th>
+                  <th className="px-4 py-3 text-right">{t("admin.moderation.table.actions")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -443,7 +450,7 @@ export function ModerationQueue({ defaultStatusFilter }: Props) {
                         onClick={() => setSelected(item)}
                         className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-700 transition-colors"
                       >
-                        Review
+                        {t("admin.moderation.action.review")}
                       </button>
                     </td>
                   </tr>
