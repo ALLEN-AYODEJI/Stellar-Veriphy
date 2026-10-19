@@ -291,3 +291,7 @@ snapshot-all: ## Snapshot all three contracts before an upgrade
 	@bash scripts/snapshot-contract-state.sh provenance
 	@bash scripts/snapshot-contract-state.sh registry
 	@echo "$(GREEN)✓ All contracts snapshotted$(NC)"
+
+upgrade-selftest: ## Run the self-test for the upgrade safety tooling (no contract build needed)
+	@echo "$(GREEN)Running upgrade safety self-test...$(NC)"
+	@bash scripts/tests/upgrade-safety-check.test.sh

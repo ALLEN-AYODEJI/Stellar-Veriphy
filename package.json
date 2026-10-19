@@ -20,6 +20,8 @@
     "reset-db": "bash scripts/reset-db.sh",
     "generate-mock-data": "node scripts/generate-mock-data.mjs",
     "provenance:recover": "node scripts/provenance-recovery.mjs",
+    "replay:events": "node scripts/contract-event-replay.mjs --all",
+    "test:upgrade-safety": "bash scripts/tests/upgrade-safety-check.test.sh",
     "api-token": "node scripts/api-token.mjs",
     "deploy:check": "bash scripts/deploy-helper.sh staging check-only",
     "deploy:staging": "bash scripts/deploy-helper.sh staging",

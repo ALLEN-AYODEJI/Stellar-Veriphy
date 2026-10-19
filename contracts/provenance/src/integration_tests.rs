@@ -156,7 +156,10 @@ mod provenance_integration_tests {
         client.revoke_certificate(&id, &RevocationReason::LegalRequirement);
 
         let second = client.try_revoke_certificate(&id, &RevocationReason::CreatorRequest);
-        assert!(second.is_err(), "revoking an already-revoked cert must fail");
+        assert!(
+            second.is_err(),
+            "revoking an already-revoked cert must fail"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -234,7 +237,10 @@ mod provenance_integration_tests {
             &RollbackReason::CreatorRequest,
         );
 
-        assert!(rollback_id_2 > rollback_id_1, "rollback ids must be monotonic");
+        assert!(
+            rollback_id_2 > rollback_id_1,
+            "rollback ids must be monotonic"
+        );
 
         let history = client.get_rollback_history(&id);
         assert_eq!(history.len(), 2, "both rollback records must be stored");

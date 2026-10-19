@@ -1,6 +1,7 @@
 import type { UploadMetadata } from "../types";
 import { toValidationResult, rejectUnknownFields, sha256Field, stellarAddressField, stringListField, textField } from "./fields";
 import { validateManifest } from "./manifest";
+import { validateManifestSchema } from "./manifestSchema";
 import { FieldError, ValidationResult, isPlainObject } from "./result";
 
 // MIME type -> accepted file extensions.
@@ -117,6 +118,9 @@ export function validateUploadMetadata(input: unknown, options: { now?: Date } =
     errors.push(...manifestResult.errors);
   } else {
     const manifest = manifestResult.value;
+    // The normalised manifest is what gets stored, so it must also match the published v1 schema.
+    const schemaResult = validateManifestSchema(manifest, "v1", { path: "manifest" });
+    if (!schemaResult.ok) errors.push(...schemaResult.errors);
     if (contentHash && manifest.contentHash !== contentHash) {
       errors.push({
         field: "manifest.contentHash",

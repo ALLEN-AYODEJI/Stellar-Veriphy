@@ -296,7 +296,12 @@ mod oracle_integration_tests {
         let client = OracleContractClient::new(&env, &oracle_id);
         let requester = Address::generate(&env);
 
-        let priorities = [Priority::Low, Priority::Normal, Priority::High, Priority::Urgent];
+        let priorities = [
+            Priority::Low,
+            Priority::Normal,
+            Priority::High,
+            Priority::Urgent,
+        ];
         let mut previous = 0u64;
 
         for priority in &priorities {
