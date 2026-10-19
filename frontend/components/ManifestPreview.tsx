@@ -2,6 +2,7 @@
 
 import { ContentManifest } from "@stellarveriphy/shared/types";
 import type { ReactNode } from "react";
+import { formatDateTime } from "@/utils/formatDateTime";
 
 interface ManifestPreviewProps {
   manifest: Partial<ContentManifest>;
@@ -57,9 +58,16 @@ function renderValue(value: unknown, depth = 0): ReactNode {
 }
 
 export function ManifestPreview({ manifest }: ManifestPreviewProps) {
+  const generatedAt = manifest.timestamp ? formatDateTime(manifest.timestamp) : null;
+
   return (
     <div className="min-w-0 rounded border border-gray-300 bg-gray-100 p-4 dark:border-gray-700 dark:bg-gray-900">
       <h2 className="mb-3 font-semibold text-black dark:text-white">Manifest Preview</h2>
+      {generatedAt && manifest.timestamp && (
+        <p className="mb-3 text-xs text-gray-600 dark:text-gray-300">
+          Generated <time dateTime={manifest.timestamp}>{generatedAt}</time>
+        </p>
+      )}
       <div
         aria-label="Structured manifest preview"
         className="max-h-[70vh] min-w-0 overflow-auto rounded bg-white p-3 text-sm text-black dark:bg-gray-950 dark:text-white"

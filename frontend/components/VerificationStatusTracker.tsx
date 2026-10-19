@@ -39,6 +39,7 @@ import {
 import type { VerificationPhase,VerificationStatus } from "@/services/verificationStatusService";
 import { PHASE_LABEL } from "@/services/verificationStatusService";
 import { useVerificationStatus } from "@/src/hooks/useVerificationStatus";
+import { formatDateTime } from "@/utils/formatDateTime";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -339,6 +340,7 @@ export const VerificationStatusTracker = forwardRef<
   const currentPhase = status?.phase ?? "submitted";
   const variant = PHASE_VARIANT[currentPhase];
   const progress = status?.progress ?? 0;
+  const lastUpdated = status?.updatedAt ? formatDateTime(status.updatedAt) : null;
   const explorerUrl = txHash ? `https://stellar.expert/explorer/testnet/tx/${txHash}` : null;
 
   return (
@@ -369,7 +371,7 @@ export const VerificationStatusTracker = forwardRef<
         <PipelineTimeline currentPhase={currentPhase} />
 
         {/* Detail rows */}
-        {(txHash || requestId) && (
+        {(txHash || requestId || status?.updatedAt) && (
           <dl className="space-y-1.5 border-t border-slate-800 pt-4">
             {requestId && (
               <div className="flex justify-between text-xs">
@@ -383,11 +385,11 @@ export const VerificationStatusTracker = forwardRef<
                 <dd className="text-slate-200 font-mono truncate max-w-[180px]">{txHash}</dd>
               </div>
             )}
-            {status?.updatedAt && (
+            {status?.updatedAt && lastUpdated && (
               <div className="flex justify-between text-xs">
-                <dt className="text-slate-400">Last update</dt>
+                <dt className="text-slate-400">Last updated</dt>
                 <dd className="text-slate-400">
-                  {new Date(status.updatedAt).toLocaleTimeString()}
+                  <time dateTime={status.updatedAt}>{lastUpdated}</time>
                 </dd>
               </div>
             )}

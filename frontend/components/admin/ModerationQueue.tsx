@@ -16,6 +16,7 @@ import type {
 import { useCallback, useEffect, useState } from "react";
 
 import DisputeAuditTrail from "@/components/DisputeAuditTrail";
+import { formatDateTime } from "@/utils/formatDateTime";
 import { cardGridClassName } from "@/components/ui/CardGrid";
 import { type MessageKey,t } from "@/lib/i18n";
 
@@ -405,6 +406,12 @@ export function ModerationQueue({ defaultStatusFilter }: Props) {
             <table className="w-full text-left" aria-label={t("admin.moderation.table.label")}>
               <thead>
                 <tr className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-700">
+                  <th className="px-4 py-3">Asset</th>
+                  <th className="px-4 py-3">Trigger</th>
+                  <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3">Created</th>
+                  <th className="px-4 py-3">Last updated</th>
+                  <th className="px-4 py-3 text-right">Actions</th>
                   <th className="px-4 py-3">{t("admin.moderation.table.asset")}</th>
                   <th className="px-4 py-3">{t("admin.moderation.table.trigger")}</th>
                   <th className="px-4 py-3">{t("admin.moderation.table.status")}</th>
@@ -433,7 +440,10 @@ export function ModerationQueue({ defaultStatusFilter }: Props) {
                       <StatusBadge status={item.status} />
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
-                      {new Date(item.createdAt).toLocaleDateString()}
+                      {formatDateTime(item.createdAt) ?? "Date unavailable"}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
+                      {formatDateTime(item.updatedAt) ?? "Date unavailable"}
                     </td>
                     <td className="px-4 py-3 text-right">
                       <button

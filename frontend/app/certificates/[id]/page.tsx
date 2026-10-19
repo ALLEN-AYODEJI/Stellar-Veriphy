@@ -49,14 +49,33 @@ function humanize(key: string) {
   return key.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase());
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({
+  title,
+  children,
+  emphasis = false,
+  subdued = false,
+}: {
+  title: string;
+  children: React.ReactNode;
+  emphasis?: boolean;
+  subdued?: boolean;
+}) {
   const id = title.toLowerCase().replace(/\W+/g, "-");
+  const sectionStyle = emphasis
+    ? "border-indigo-200 bg-indigo-50/50 shadow-md dark:border-indigo-900 dark:bg-indigo-950/30"
+    : subdued
+      ? "border-slate-100 bg-slate-50/70 shadow-none dark:border-gray-800 dark:bg-gray-900/60"
+      : "border-slate-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900";
+
   return (
-    <section aria-labelledby={id} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-      <h2 id={id} className="text-lg font-semibold">
+    <section aria-labelledby={id} className={`rounded-xl border p-4 sm:p-5 ${sectionStyle}`}>
+      <h2
+        id={id}
+        className={`font-semibold ${emphasis ? "text-xl text-indigo-950 dark:text-indigo-100" : subdued ? "text-base text-slate-600 dark:text-gray-300" : "text-lg dark:text-white"}`}
+      >
         {title}
       </h2>
-      <div className="mt-4">{children}</div>
+      <div className="mt-3">{children}</div>
     </section>
   );
 }
@@ -121,8 +140,45 @@ export default async function CertificateDetail({ params }: { params: Params }) 
         </div>
       </header>
 
-      <div className="mt-8 grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
-        <div className="space-y-6">
+      <div className="mt-6 grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
+        <div className="space-y-4">
+          <Section title="Certificate evidence" emphasis>
+            <dl className="divide-y divide-indigo-100 dark:divide-indigo-900/60">
+              {cert ? (
+                <>
+                  <Field label="Certificate ID" mono>
+                    {cert.id}
+                  </Field>
+                  <Field label="Minted">{formatDate(cert.timestamp)}</Field>
+                  <Field label="Storage reference" mono>
+                    {cert.storageRef}
+                  </Field>
+                  <Field label="Manifest hash" mono>
+                    {cert.manifestHash}
+                  </Field>
+                </>
+              ) : (
+                <Field label="Certificate">
+                  <Missing />
+                </Field>
+              )}
+              <Field label="Content hash" mono>
+                {manifest.contentHash}
+              </Field>
+              {evidence && (
+                <>
+                  <Field label="Verified by">{evidence.enclave}</Field>
+                  <Field label="Attestation hash" mono>
+                    {evidence.attestationHash}
+                  </Field>
+                  <Field label="Verifier code hash" mono>
+                    {evidence.teeCodeHash}
+                  </Field>
+                </>
+              )}
+            </dl>
+          </Section>
+
           <Section title="Why this score?">
             <ConfidenceExplanation result={confidence} />
           </Section>
@@ -156,8 +212,8 @@ export default async function CertificateDetail({ params }: { params: Params }) 
           </Section>
         </div>
 
-        <div className="space-y-6">
-          <Section title="Provenance">
+        <div className="space-y-4">
+          <Section title="Provenance" subdued>
             <dl className="divide-y divide-slate-100">
               <Field label="Original creator" mono>
                 <span className="inline-flex max-w-full items-center gap-1">
@@ -176,43 +232,6 @@ export default async function CertificateDetail({ params }: { params: Params }) 
                   {value}
                 </Field>
               ))}
-            </dl>
-          </Section>
-
-          <Section title="Certificate">
-            <dl className="divide-y divide-slate-100">
-              {cert ? (
-                <>
-                  <Field label="Certificate ID" mono>
-                    {cert.id}
-                  </Field>
-                  <Field label="Minted">{formatDate(cert.timestamp)}</Field>
-                  <Field label="Storage reference" mono>
-                    {cert.storageRef}
-                  </Field>
-                  <Field label="Manifest hash" mono>
-                    {cert.manifestHash}
-                  </Field>
-                </>
-              ) : (
-                <Field label="Certificate">
-                  <Missing />
-                </Field>
-              )}
-              <Field label="Content hash" mono>
-                {manifest.contentHash}
-              </Field>
-              {evidence && (
-                <>
-                  <Field label="Verified by">{evidence.enclave}</Field>
-                  <Field label="Attestation hash" mono>
-                    {evidence.attestationHash}
-                  </Field>
-                  <Field label="Verifier code hash" mono>
-                    {evidence.teeCodeHash}
-                  </Field>
-                </>
-              )}
             </dl>
           </Section>
 

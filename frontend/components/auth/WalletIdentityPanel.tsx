@@ -33,6 +33,7 @@ import {
   shortPublicKey,
   submitIdentityBinding,
 } from "@/services/walletIdentityService";
+import { formatDateTime } from "@/utils/formatDateTime";
 
 // ---------------------------------------------------------------------------
 // Props
@@ -219,9 +220,9 @@ export function WalletIdentityPanel({
             </div>
           )}
           <div>
-            <dt className="text-gray-500 dark:text-gray-400">Bound at</dt>
+            <dt className="text-gray-500 dark:text-gray-400">Last updated</dt>
             <dd className="text-gray-900 dark:text-gray-100">
-              {new Date(binding.updatedAt).toLocaleString()}
+              {formatDateTime(binding.updatedAt) ?? "Date unavailable"}
             </dd>
           </div>
         </dl>

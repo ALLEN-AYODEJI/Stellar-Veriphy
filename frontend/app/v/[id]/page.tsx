@@ -47,14 +47,33 @@ function formatDate(iso: string | number) {
   return date.toLocaleString("en", { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" }) + " UTC";
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({
+  title,
+  children,
+  emphasis = false,
+  subdued = false,
+}: {
+  title: string;
+  children: React.ReactNode;
+  emphasis?: boolean;
+  subdued?: boolean;
+}) {
   const id = title.toLowerCase().replace(/\W+/g, "-");
+  const sectionStyle = emphasis
+    ? "border-indigo-200 bg-indigo-50/50 shadow-md dark:border-indigo-900 dark:bg-indigo-950/30"
+    : subdued
+      ? "border-slate-100 bg-slate-50/70 shadow-none dark:border-gray-800 dark:bg-gray-900/60"
+      : "border-slate-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900";
+
   return (
-    <section aria-labelledby={id} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6 dark:border-gray-800 dark:bg-gray-900">
-      <h2 id={id} className="text-lg font-semibold dark:text-white">
+    <section aria-labelledby={id} className={`rounded-xl border p-4 sm:p-5 ${sectionStyle}`}>
+      <h2
+        id={id}
+        className={`font-semibold ${emphasis ? "text-xl text-indigo-950 dark:text-indigo-100" : subdued ? "text-base text-slate-600 dark:text-gray-300" : "text-lg dark:text-white"}`}
+      >
         {title}
       </h2>
-      <div className="mt-4">{children}</div>
+      <div className="mt-3">{children}</div>
     </section>
   );
 }
@@ -183,29 +202,39 @@ export default async function ShareableVerificationPage({
       </header>
 
       {/* Grid */}
-      <div className="mt-8 grid gap-6 lg:grid-cols-3">
-        <div className="space-y-6 lg:col-span-2">
-          {/* Metadata Section */}
-          <Section title="Asset Manifest & Provenance">
-            <dl className="divide-y divide-slate-100 dark:divide-gray-800">
-              <Field label="Original creator" mono>
-                <span className="inline-flex max-w-full items-center gap-1">
-                  <span className="min-w-0 break-all">{manifest.creator}</span>
-                  <CopyButton text={manifest.creator} label="Copy creator wallet address" />
-                </span>
-              </Field>
-              <Field label="Content Hash" mono>
-                {manifest.contentHash}
-              </Field>
-              <Field label="Created At">{formatDate(manifest.timestamp)}</Field>
-              {manifest.metadata?.device && (
-                <Field label="Device">{manifest.metadata.device}</Field>
+      <div className="mt-6 grid gap-4 lg:grid-cols-3">
+        <div className="space-y-4 lg:col-span-2">
+          <Section title="Verification evidence" emphasis>
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-indigo-100 pb-4 dark:border-indigo-900/60">
+              <span className="text-sm font-medium text-slate-700 dark:text-gray-200">
+                Confidence score
+              </span>
+              <ConfidenceScore result={confidence} size="lg" />
+            </div>
+            <div className="mt-4">
+              <ConfidenceExplanation result={confidence} />
+            </div>
+            <dl className="mt-5 divide-y divide-indigo-100 border-t border-indigo-100 dark:divide-indigo-900/60 dark:border-indigo-900/60">
+              {cert ? (
+                <>
+                  <Field label="Certificate ID" mono>
+                    {cert.id}
+                  </Field>
+                  <Field label="Minted Date">{formatDate(cert.timestamp)}</Field>
+                  <Field label="Storage Ref" mono>
+                    {cert.storageRef}
+                  </Field>
+                </>
+              ) : (
+                <div className="py-2 text-amber-600">Pending on-chain minting</div>
               )}
-              {manifest.metadata?.location && (
-                <Field label="Location">{manifest.metadata.location}</Field>
-              )}
-              {manifest.metadata?.aiModel && (
-                <Field label="AI Model">{manifest.metadata.aiModel}</Field>
+              {evidence && (
+                <>
+                  <Field label="Attestation Enclave">{evidence.enclave}</Field>
+                  <Field label="Attestation Hash" mono>
+                    {evidence.attestationHash}
+                  </Field>
+                </>
               )}
             </dl>
           </Section>
@@ -234,37 +263,28 @@ export default async function ShareableVerificationPage({
           </Section>
         </div>
 
-        {/* Sidebar */}
-        <div className="space-y-6">
-          <Section title="Why this score?">
-            <ConfidenceScore result={confidence} />
-            <div className="mt-4">
-              <ConfidenceExplanation result={confidence} />
-            </div>
-          </Section>
-
-          <Section title="On-Chain Certificate">
-            <dl className="divide-y divide-slate-100 dark:divide-gray-800 text-xs">
-              {cert ? (
-                <>
-                  <Field label="Certificate ID" mono>
-                    {cert.id}
-                  </Field>
-                  <Field label="Minted Date">{formatDate(cert.timestamp)}</Field>
-                  <Field label="Storage Ref" mono>
-                    {cert.storageRef}
-                  </Field>
-                </>
-              ) : (
-                <div className="py-2 text-amber-600">Pending on-chain minting</div>
+        {/* Supporting details */}
+        <div className="space-y-4">
+          <Section title="Asset Manifest & Provenance" subdued>
+            <dl className="divide-y divide-slate-100 dark:divide-gray-800">
+              <Field label="Original creator" mono>
+                <span className="inline-flex max-w-full items-center gap-1">
+                  <span className="min-w-0 break-all">{manifest.creator}</span>
+                  <CopyButton text={manifest.creator} label="Copy creator wallet address" />
+                </span>
+              </Field>
+              <Field label="Content Hash" mono>
+                {manifest.contentHash}
+              </Field>
+              <Field label="Created At">{formatDate(manifest.timestamp)}</Field>
+              {manifest.metadata?.device && (
+                <Field label="Device">{manifest.metadata.device}</Field>
               )}
-              {evidence && (
-                <>
-                  <Field label="Attestation Enclave">{evidence.enclave}</Field>
-                  <Field label="Attestation Hash" mono>
-                    {evidence.attestationHash}
-                  </Field>
-                </>
+              {manifest.metadata?.location && (
+                <Field label="Location">{manifest.metadata.location}</Field>
+              )}
+              {manifest.metadata?.aiModel && (
+                <Field label="AI Model">{manifest.metadata.aiModel}</Field>
               )}
             </dl>
           </Section>
