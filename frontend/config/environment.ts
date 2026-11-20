@@ -197,7 +197,9 @@ export interface CapabilityCheck {
   capability: BrowserCapability;
   /** Whether the capability is available */
   supported: boolean;
-  /** Human-readable name of the capability */
+  /** Plain-language name of the capability, safe for primary messages */
+  name: string;
+  /** Technical name of the capability, for "technical details" only */
   label: string;
   /** Targeted, actionable guidance shown when the capability is missing */
   guidance: string;
@@ -212,46 +214,59 @@ export interface CapabilityReport {
   checks: CapabilityCheck[];
 }
 
-const CAPABILITY_META: Record<BrowserCapability, { label: string; guidance: string }> = {
+/**
+ * Copy for each capability. `name` is plain language for the primary message;
+ * `label` is the technical name, shown only inside "technical details".
+ * `guidance` is the recommended next step, written for non-technical users.
+ */
+const CAPABILITY_META: Record<BrowserCapability, { name: string; label: string; guidance: string }> = {
   serviceWorker: {
+    name: "offline access",
     label: "Service Workers",
     guidance:
-      "Offline support and background sync are unavailable. Use a modern browser (Chrome, Edge, Firefox, or Safari) to enable them.",
+      "Offline access and background updates are off. Update to the latest Chrome, Edge, Firefox, or Safari to turn them on.",
   },
   cryptoSubtle: {
+    name: "secure signing",
     label: "Web Crypto (crypto.subtle)",
     guidance:
-      "Secure cryptography is unavailable. Access the app over HTTPS in a modern browser to enable signing and encryption.",
+      "Signing and encryption need a secure connection. Open StellarVeriphy over HTTPS in a current browser.",
   },
   indexedDB: {
+    name: "saving drafts on this device",
     label: "IndexedDB",
     guidance:
-      "Local data storage is unavailable. Disable private/incognito mode or use a browser that supports IndexedDB.",
+      "Drafts can't be saved on this device. Turn off private or incognito mode, or switch to a current browser.",
   },
   broadcastChannel: {
+    name: "syncing across tabs",
     label: "BroadcastChannel",
     guidance:
-      "Cross-tab synchronization is unavailable. Some real-time updates may not appear across multiple tabs.",
+      "Changes made in another open tab may not appear until you refresh this page.",
   },
   localStorage: {
+    name: "remembering your preferences",
     label: "Local Storage",
     guidance:
-      "Preferences cannot be saved. Enable site storage or exit private/incognito mode to persist settings.",
+      "Your preferences won't be remembered. Allow site storage for this site, or leave private browsing.",
   },
   fetch: {
+    name: "loading data",
     label: "Fetch API",
     guidance:
-      "Network requests are unavailable. Please upgrade to a modern browser to use the app.",
+      "Pages can't load data in this browser. Update to the latest Chrome, Edge, Firefox, or Safari.",
   },
   webSockets: {
+    name: "live status updates",
     label: "WebSockets",
     guidance:
-      "Live updates are unavailable. A modern browser with WebSocket support is required for real-time features.",
+      "Live status updates are paused. Refresh the page to see the latest information.",
   },
   notifications: {
+    name: "browser notifications",
     label: "Notifications API",
     guidance:
-      "Push notifications are unavailable. You can still use the app, but alerts will not be delivered.",
+      "You won't receive browser notifications. Everything else still works. Allow notifications in your browser settings to turn them on.",
   },
 };
 
@@ -326,6 +341,7 @@ export function detectCapabilities(): CapabilityReport {
   const checks: CapabilityCheck[] = all.map((capability) => ({
     capability,
     supported: checkCapability(capability),
+    name: CAPABILITY_META[capability].name,
     label: CAPABILITY_META[capability].label,
     guidance: CAPABILITY_META[capability].guidance,
   }));
@@ -346,7 +362,7 @@ export function detectCapabilities(): CapabilityReport {
 export function getMissingCapabilityMessage(capability: BrowserCapability): string | null {
   if (checkCapability(capability)) return null;
   const meta = CAPABILITY_META[capability];
-  return `${meta.label} is not supported in this browser. ${meta.guidance}`;
+  return `This browser can't support ${meta.name}. ${meta.guidance}`;
 }
 
 /**
@@ -359,6 +375,7 @@ export function getFirstMissingRequiredCapability(): CapabilityCheck | null {
       return {
         capability,
         supported: false,
+        name: CAPABILITY_META[capability].name,
         label: CAPABILITY_META[capability].label,
         guidance: CAPABILITY_META[capability].guidance,
       };
