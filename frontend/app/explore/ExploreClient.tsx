@@ -1,50 +1,21 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import Link from "next/link";
 import { computeConfidence } from "@stellarveriphy/shared/scoring";
 import type { VerificationRecord } from "@stellarveriphy/shared/types";
+import Link from "next/link";
+import { useMemo, useState } from "react";
+
+import { matchesAssetStatusFilter } from "@/components/AssetStatusFilterChips";
 import ConfidenceScore from "@/components/ConfidenceScore";
 import StatusBadge from "@/components/StatusBadge";
-import {
-  matchesAssetStatusFilter,
-  type AssetStatusFilter,
-} from "@/components/AssetStatusFilterChips";
-import { CollapsibleMetadataPanel } from "@/components/ui/CollapsibleMetadataPanel";
 import { CardGrid } from "@/components/ui/CardGrid";
+import { CollapsibleMetadataPanel } from "@/components/ui/CollapsibleMetadataPanel";
 import { SearchFilters, type SearchFiltersState } from "@/components/ui/SearchFilters";
+
+import { computeStatusCounts, filterScopeRecords } from "./exploreFilters";
 
 interface ExploreClientProps {
   initialRecords: VerificationRecord[];
-}
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/** Returns true when a record's timestamp falls within the chosen time window. */
-function matchesTimeRange(
-  record: VerificationRecord,
-  range: SearchFiltersState["timeRange"]
-): boolean {
-  if (range === "all") return true;
-  const ts = new Date(record.manifest.timestamp).getTime();
-  const now = Date.now();
-  const cutoffs: Record<Exclude<SearchFiltersState["timeRange"], "all">, number> = {
-    "24h": now - 24 * 60 * 60 * 1000,
-    "7d": now - 7 * 24 * 60 * 60 * 1000,
-    "30d": now - 30 * 24 * 60 * 60 * 1000,
-  };
-  return ts >= cutoffs[range];
-}
-
-/** Returns true when a record's mediaType matches the chosen asset type filter. */
-function matchesAssetType(
-  record: VerificationRecord,
-  assetType: SearchFiltersState["assetType"]
-): boolean {
-  if (assetType === "all") return true;
-  return record.mediaType?.toLowerCase() === assetType;
 }
 
 // ---------------------------------------------------------------------------
@@ -59,42 +30,24 @@ export function ExploreClient({ initialRecords }: ExploreClientProps) {
     query: "",
   });
 
-  // Status counts (unaffected by status filter itself, so chips show totals)
-  const statusCounts = useMemo(() => {
-    const map: Partial<Record<AssetStatusFilter, number>> = {
-      all: initialRecords.length,
-      verified: 0,
-      pending: 0,
-      unverified: 0,
-      disputed: 0,
-      archived: 0,
-    };
-    for (const r of initialRecords) {
-      if (matchesAssetStatusFilter(r.status, "verified")) map.verified = (map.verified ?? 0) + 1;
-      if (matchesAssetStatusFilter(r.status, "pending")) map.pending = (map.pending ?? 0) + 1;
-      if (matchesAssetStatusFilter(r.status, "unverified")) map.unverified = (map.unverified ?? 0) + 1;
-      if (matchesAssetStatusFilter(r.status, "disputed")) map.disputed = (map.disputed ?? 0) + 1;
-      if (matchesAssetStatusFilter(r.status, "archived")) map.archived = (map.archived ?? 0) + 1;
-    }
-    return map;
-  }, [initialRecords]);
+  // Records that pass every filter except status. Chip counts are taken from
+  // this scope so each count matches what selecting that chip would show (#907).
+  const scopeRecords = useMemo(
+    () =>
+      filterScopeRecords(initialRecords, {
+        timeRange: filters.timeRange,
+        assetType: filters.assetType,
+        query: filters.query,
+      }),
+    [initialRecords, filters.timeRange, filters.assetType, filters.query]
+  );
 
-  const filteredRecords = useMemo(() => {
-    const q = filters.query.trim().toLowerCase();
-    return initialRecords.filter((r) => {
-      if (!matchesAssetStatusFilter(r.status, filters.status)) return false;
-      if (!matchesTimeRange(r, filters.timeRange)) return false;
-      if (!matchesAssetType(r, filters.assetType)) return false;
-      if (q) {
-        const haystack = [r.title, r.id, r.mediaType, r.manifest.creator]
-          .filter(Boolean)
-          .join(" ")
-          .toLowerCase();
-        if (!haystack.includes(q)) return false;
-      }
-      return true;
-    });
-  }, [initialRecords, filters]);
+  const statusCounts = useMemo(() => computeStatusCounts(scopeRecords), [scopeRecords]);
+
+  const filteredRecords = useMemo(
+    () => scopeRecords.filter((r) => matchesAssetStatusFilter(r.status, filters.status)),
+    [scopeRecords, filters.status]
+  );
 
   const hasActiveFilters =
     filters.status !== "all" ||
@@ -105,16 +58,14 @@ export function ExploreClient({ initialRecords }: ExploreClientProps) {
   return (
     <div className="mt-6 space-y-6">
       {/* ── Filters ─────────────────────────────────────────────────────────── */}
-      <SearchFilters
-        value={filters}
-        onChange={setFilters}
-        statusCounts={statusCounts}
-      />
+      <SearchFilters value={filters} onChange={setFilters} statusCounts={statusCounts} />
 
       {/* ── Result count ────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between text-xs text-slate-500 dark:text-gray-400">
         <span>
-          Showing <strong className="text-slate-700 dark:text-gray-200">{filteredRecords.length}</strong> of {initialRecords.length} assets
+          Showing{" "}
+          <strong className="text-slate-700 dark:text-gray-200">{filteredRecords.length}</strong> of{" "}
+          {initialRecords.length} assets
         </span>
         {hasActiveFilters && (
           <button
@@ -176,22 +127,21 @@ export function ExploreClient({ initialRecords }: ExploreClientProps) {
               </div>
 
               {/* Collapsible metadata — only rendered when metadata exists */}
-              {record.manifest.metadata &&
-                Object.keys(record.manifest.metadata).length > 0 && (
-                  <div className="border-t border-slate-100 dark:border-gray-800">
-                    <CollapsibleMetadataPanel
-                      title="File metadata"
-                      metadata={
-                        record.manifest.metadata as Record<
-                          string,
-                          string | number | boolean | null | undefined
-                        >
-                      }
-                      previewCount={2}
-                      bare
-                    />
-                  </div>
-                )}
+              {record.manifest.metadata && Object.keys(record.manifest.metadata).length > 0 && (
+                <div className="border-t border-slate-100 dark:border-gray-800">
+                  <CollapsibleMetadataPanel
+                    title="File metadata"
+                    metadata={
+                      record.manifest.metadata as Record<
+                        string,
+                        string | number | boolean | null | undefined
+                      >
+                    }
+                    previewCount={2}
+                    bare
+                  />
+                </div>
+              )}
             </li>
           ))}
         </CardGrid>
