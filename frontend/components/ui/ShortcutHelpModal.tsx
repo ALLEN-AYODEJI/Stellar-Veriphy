@@ -9,9 +9,17 @@ interface ShortcutHelpModalProps {
   isOpen: boolean;
   onClose: () => void;
   shortcuts: ShortcutAction[];
+  /** Returns human-readable alternatives for an action, e.g. `["Ctrl+K"]`. */
   getDisplayKeys: (action: ShortcutAction) => string[];
 }
 
+/**
+ * Lists every registered keyboard shortcut, grouped by category.
+ *
+ * Each action's alternatives (for example `Ctrl+?` and `Ctrl+/`) are shown as
+ * separate key chips joined by "or", so a combination is never read as a
+ * chord of its own.
+ */
 export function ShortcutHelpModal({
   isOpen,
   onClose,
@@ -31,32 +39,34 @@ export function ShortcutHelpModal({
     <Modal isOpen={isOpen} onClose={onClose} title="Keyboard Shortcuts">
       <div className="space-y-4">
         {Object.entries(grouped).map(([category, actions]) => (
-          <div key={category}>
+          <section key={category} aria-label={category}>
             <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">
               {category}
             </h3>
-            <div className="space-y-1">
+            <ul className="space-y-1">
               {actions.map((action) => (
-                <div key={action.id} className="flex items-center justify-between py-1.5">
+                <li
+                  key={action.id}
+                  className="flex flex-wrap items-center justify-between gap-2 py-1.5"
+                >
                   <span className="text-sm text-gray-700 dark:text-gray-300">{action.label}</span>
-                  <div className="flex items-center gap-1">
+                  <span className="flex flex-wrap items-center gap-1">
                     {getDisplayKeys(action).map((key, i) => (
-                      <span key={i}>
-                        {i > 0 && <span className="text-gray-400 mx-0.5 text-xs">+</span>}
-                        <kbd className="inline-flex items-center px-1.5 py-0.5 text-xs font-medium text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded">
+                      <span key={key} className="inline-flex items-center gap-1">
+                        {i > 0 && <span className="text-gray-400 text-xs">or</span>}
+                        <kbd className="inline-flex items-center px-1.5 py-0.5 text-xs font-medium text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded whitespace-nowrap">
                           {key}
                         </kbd>
                       </span>
                     ))}
-                  </div>
-                </div>
+                  </span>
+                </li>
               ))}
-            </div>
-          </div>
+            </ul>
+          </section>
         ))}
-        <p className="text-xs text-gray-400 mt-4 pt-3 border-t border-gray-200 dark:border-gray-800">
-          Customize shortcuts by pressing a keyboard combination after clicking the shortcut in the
-          settings panel.
+        <p className="text-xs text-gray-500 dark:text-gray-400 mt-4 pt-3 border-t border-gray-200 dark:border-gray-800">
+          These shortcuts work on every page. Press Esc to close this dialog.
         </p>
       </div>
     </Modal>

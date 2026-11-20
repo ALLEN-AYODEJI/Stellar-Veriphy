@@ -3,6 +3,7 @@
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { OPEN_SHORTCUT_HELP_EVENT } from "@/components/ShortcutHelpButton";
 import { CommandPalette } from "@/components/ui/CommandPalette";
 import { ShortcutHelpModal } from "@/components/ui/ShortcutHelpModal";
 import { useHelp } from "@/context/HelpContext";
@@ -85,7 +86,7 @@ export function KeyboardShortcutsProvider({ children }: { children: React.ReactN
         id: s.id,
         label: s.label,
         category: s.category,
-        shortcut: getDisplayKeys(s).join("+"),
+        shortcut: getDisplayKeys(s).join(" or "),
         action: s.handler,
       })),
       {
@@ -100,6 +101,13 @@ export function KeyboardShortcutsProvider({ children }: { children: React.ReactN
     ],
     [shortcuts, getDisplayKeys, markTutorialSeen, startTutorial]
   );
+
+  // Opened from the visible header control as well as the keyboard shortcut.
+  useEffect(() => {
+    const open = () => setShowShortcutHelp(true);
+    window.addEventListener(OPEN_SHORTCUT_HELP_EVENT, open);
+    return () => window.removeEventListener(OPEN_SHORTCUT_HELP_EVENT, open);
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
