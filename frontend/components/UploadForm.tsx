@@ -1,21 +1,29 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  type ContentManifest,
+  errorsByField,
+  type FieldError,
   SUPPORTED_MEDIA_TYPES,
   UPLOAD_LIMITS,
-  errorsByField,
-  validateUploadMetadata,
-  type ContentManifest,
-  type FieldError,
   type UploadSessionView,
+  validateUploadMetadata,
   type VerificationJobView,
 } from "@stellarveriphy/shared";
+import { useEffect, useMemo, useRef, useState } from "react";
+
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useFileHash } from "@/hooks/useFileHash";
 import { useJobStatuses } from "@/hooks/useJobStatuses";
-import { ApiError, api } from "@/lib/api";
-import { completeUploadSession, findResumableSession, openUploadSession, uploadMissingChunks } from "@/lib/resumable-upload";
+import { api, ApiError } from "@/lib/api";
+import {
+  completeUploadSession,
+  findResumableSession,
+  openUploadSession,
+  uploadMissingChunks,
+} from "@/lib/resumable-upload";
 import { trackJob } from "@/lib/tracked-jobs";
+
 import { Field } from "./Field";
 import { JobProgress } from "./JobProgress";
 import { MediaSnapshotPreview } from "./MediaSnapshotPreview";
@@ -41,7 +49,9 @@ const FIELD_FOR_PATH: Record<string, string> = {
   tags: "tags",
 };
 
-const ACCEPT = Object.entries(SUPPORTED_MEDIA_TYPES).flatMap(([type, exts]) => [type, ...exts]).join(",");
+const ACCEPT = Object.entries(SUPPORTED_MEDIA_TYPES)
+  .flatMap(([type, exts]) => [type, ...exts])
+  .join(",");
 const DRAFT_KEY = "stellar-veriphy:certificate-upload-draft:v1";
 const DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -122,13 +132,17 @@ function MetadataPreview({
       </pre>
       {errors.length > 0 && (
         <div className="notice notice-error mt-4" role="alert">
-          <p><strong>Review these metadata fields:</strong></p>
+          <p>
+            <strong>Review these metadata fields:</strong>
+          </p>
           <ul>
             {errors.map((error) => {
               const input = FIELD_FOR_PATH[error.field] ?? error.field;
               return (
                 <li key={`${error.field}-${error.message}`}>
-                  <a href={`#${input}`}>{error.field}: {error.message}</a>
+                  <a href={`#${input}`}>
+                    {error.field}: {error.message}
+                  </a>
                   {error.hint && <span className="hint"> {error.hint}</span>}
                 </li>
               );
@@ -148,6 +162,7 @@ export function UploadForm() {
   const dragDepth = useRef(0);
   const [values, setValues] = useState<FormValues>(() => emptyValues());
   const [restoredDraft, setRestoredDraft] = useState<DraftState | null>(null);
+  const [isDiscardConfirmOpen, setIsDiscardConfirmOpen] = useState(false);
   const [touched, setTouched] = useState<Set<string>>(new Set());
   const [submitAttempted, setSubmitAttempted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -195,7 +210,8 @@ export function UploadForm() {
     window.localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
   }, [file, restoredDraft?.fileName, restoredDraft?.fileSize, values]);
 
-  const set = (name: keyof typeof values) =>
+  const set =
+    (name: keyof typeof values) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
       setValues((v) => ({ ...v, [name]: e.target.value }));
       setServerError(null);
@@ -220,7 +236,10 @@ export function UploadForm() {
       creator: values.creator,
       title: values.title,
       description: values.description,
-      tags: values.tags.split(",").map((t) => t.trim()).filter(Boolean),
+      tags: values.tags
+        .split(",")
+        .map((t) => t.trim())
+        .filter(Boolean),
       manifest,
     };
   }, [file, hashState, values]);
@@ -235,8 +254,9 @@ export function UploadForm() {
     if (!sessionCreator || !sessionHash) return;
     let cancelled = false;
     findResumableSession(sessionCreator, sessionHash).then(
-      (session) => !cancelled && setResumable(session && session.completedChunks.length > 0 ? session : null),
-      () => {},
+      (session) =>
+        !cancelled && setResumable(session && session.completedChunks.length > 0 ? session : null),
+      () => {}
     );
     return () => {
       cancelled = true;
@@ -254,7 +274,11 @@ export function UploadForm() {
 
   // With no file, the individual file/hash errors are noise; give one clear instruction.
   if (!file && inputErrors.file) {
-    inputErrors.file = { field: "file", message: "Choose a file to upload.", hint: "Its hash becomes the content hash in the manifest." };
+    inputErrors.file = {
+      field: "file",
+      message: "Choose a file to upload.",
+      hint: "Its hash becomes the content hash in the manifest.",
+    };
   }
   // Hash-related errors are noise while the hash is still being computed.
   if (hashState.status === "hashing") delete inputErrors.file;
@@ -288,7 +312,9 @@ export function UploadForm() {
     setIsDragActive(true);
     const item = event.dataTransfer.items[0];
     const mimeType = item?.type.split(";")[0].trim().toLowerCase();
-    setDragInvalid(Boolean(item && item.kind === "file" && (!mimeType || !SUPPORTED_MEDIA_TYPES[mimeType])));
+    setDragInvalid(
+      Boolean(item && item.kind === "file" && (!mimeType || !SUPPORTED_MEDIA_TYPES[mimeType]))
+    );
   };
 
   const handleDragLeave = (event: React.DragEvent<HTMLDivElement>) => {
@@ -329,7 +355,11 @@ export function UploadForm() {
         mode: restartUpload ? "restart" : "resume",
       });
       setUploadSession(session);
-      session = await uploadMissingChunks({ file: hashState.file, session, onProgress: setUploadSession });
+      session = await uploadMissingChunks({
+        file: hashState.file,
+        session,
+        onProgress: setUploadSession,
+      });
       const upload = await api.createUpload(metadata);
       setUploadSession(await completeUploadSession(session, upload.id));
       setResumable(null);
@@ -339,7 +369,9 @@ export function UploadForm() {
       setRestoredDraft(null);
       setSubmitted(job);
     } catch (err) {
-      setServerError(err instanceof ApiError ? err : new ApiError("Submission failed. Please try again.", 0));
+      setServerError(
+        err instanceof ApiError ? err : new ApiError("Submission failed. Please try again.", 0)
+      );
     } finally {
       setSubmitting(false);
     }
@@ -353,14 +385,22 @@ export function UploadForm() {
         {file && (
           <MediaSnapshotPreview
             file={file}
-            verificationState={job.status === "completed" ? "completed" : job.status === "failed" ? "failed" : "processing"}
+            verificationState={
+              job.status === "completed"
+                ? "completed"
+                : job.status === "failed"
+                  ? "failed"
+                  : "processing"
+            }
           />
         )}
         <JobProgress job={job} />
         <p>
           Track this and earlier submissions on <a href="/creator/jobs">My verification jobs</a>.
         </p>
-        <button type="button" className="secondary" onClick={() => window.location.reload()}>Upload another file</button>
+        <button type="button" className="secondary" onClick={() => window.location.reload()}>
+          Upload another file
+        </button>
       </section>
     );
   }
@@ -373,7 +413,12 @@ export function UploadForm() {
       ref={formRef}
       onSubmit={onSubmit}
       onKeyDown={(e) => {
-        if ((e.ctrlKey || e.metaKey) && e.key === "Enter" && !submitting && hashState.status !== "hashing") {
+        if (
+          (e.ctrlKey || e.metaKey) &&
+          e.key === "Enter" &&
+          !submitting &&
+          hashState.status !== "hashing"
+        ) {
           e.preventDefault();
           e.currentTarget.requestSubmit();
         }
@@ -382,23 +427,34 @@ export function UploadForm() {
       className="form"
     >
       {/* Transient failure (network, 5xx, rate limit): one-click resubmit; the draft is kept */}
-      {serverError && serverError.isRetryable && serverError.errors.length === 0 && summaryErrors.length === 0 && (
-        <RetryableError
-          variant="inline"
-          error={serverError}
-          title="Submission didn't go through"
-          retryLabel="Resubmit"
-          retrying={submitting}
-          onRetry={() => formRef.current?.requestSubmit()}
-        />
-      )}
+      {serverError &&
+        serverError.isRetryable &&
+        serverError.errors.length === 0 &&
+        summaryErrors.length === 0 && (
+          <RetryableError
+            variant="inline"
+            error={serverError}
+            title="Submission didn't go through"
+            retryLabel="Resubmit"
+            retrying={submitting}
+            onRetry={() => formRef.current?.requestSubmit()}
+          />
+        )}
 
-      {(summaryErrors.length > 0 || (serverError && !(serverError.isRetryable && serverError.errors.length === 0))) && (
+      {(summaryErrors.length > 0 ||
+        (serverError && !(serverError.isRetryable && serverError.errors.length === 0))) && (
         <div className="notice notice-error" role="alert">
-          <p><strong>{serverError && serverError.errors.length === 0 ? serverError.message : "Please fix the following before submitting:"}</strong></p>
+          <p>
+            <strong>
+              {serverError && serverError.errors.length === 0
+                ? serverError.message
+                : "Please fix the following before submitting:"}
+            </strong>
+          </p>
           {serverError?.httpStatus === 429 && (
             <p className="hint">
-              Retry after {serverError.retryAfterSeconds ?? "the indicated backoff period"} seconds. Your draft is saved locally, so you can safely wait and submit again.
+              Retry after {serverError.retryAfterSeconds ?? "the indicated backoff period"} seconds.
+              Your draft is saved locally, so you can safely wait and submit again.
             </p>
           )}
           {summaryErrors.length > 0 && (
@@ -418,19 +474,29 @@ export function UploadForm() {
         <div className="notice" role="status">
           <p>
             <strong>Draft restored.</strong> Your form details were saved locally
-            {restoredDraft.fileName ? ` with ${restoredDraft.fileName}.` : "."} Re-select the file before submitting.
+            {restoredDraft.fileName ? ` with ${restoredDraft.fileName}.` : "."} Re-select the file
+            before submitting.
           </p>
-          <button
-            type="button"
-            className="secondary"
-            onClick={() => {
+          <button type="button" className="secondary" onClick={() => setIsDiscardConfirmOpen(true)}>
+            Discard draft
+          </button>
+          <ConfirmDialog
+            isOpen={isDiscardConfirmOpen}
+            variant="danger"
+            title="Discard saved draft?"
+            message={`This permanently deletes the saved form details${
+              restoredDraft.fileName ? ` for ${restoredDraft.fileName}` : ""
+            } (saved ${new Date(restoredDraft.savedAt).toLocaleString()}). Choose "Keep draft" to leave it unchanged.`}
+            confirmLabel="Discard draft"
+            cancelLabel="Keep draft"
+            onConfirm={() => {
+              setIsDiscardConfirmOpen(false);
               window.localStorage.removeItem(DRAFT_KEY);
               setValues(emptyValues());
               setRestoredDraft(null);
             }}
-          >
-            Discard draft
-          </button>
+            onCancel={() => setIsDiscardConfirmOpen(false)}
+          />
         </div>
       )}
 
@@ -463,7 +529,11 @@ export function UploadForm() {
               setIsDragActive(true);
               const item = event.dataTransfer.items[0];
               const mimeType = item?.type.split(";")[0].trim().toLowerCase();
-              setDragInvalid(Boolean(item && item.kind === "file" && (!mimeType || !SUPPORTED_MEDIA_TYPES[mimeType])));
+              setDragInvalid(
+                Boolean(
+                  item && item.kind === "file" && (!mimeType || !SUPPORTED_MEDIA_TYPES[mimeType])
+                )
+              );
             }}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
@@ -485,7 +555,7 @@ export function UploadForm() {
             />
             <p id="file-drop-status" className="text-sm font-medium" aria-live="polite">
               {visibleFileError || dragInvalid
-                ? visibleFileError ?? "This file type is not supported"
+                ? (visibleFileError ?? "This file type is not supported")
                 : isDragActive
                   ? "Release to add this file"
                   : file
@@ -493,34 +563,70 @@ export function UploadForm() {
                     : "Drop a media file here, or choose one"}
             </p>
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              Images, video, audio, or PDF · up to {UPLOAD_LIMITS.maxFileSizeBytes / (1024 * 1024)} MB
+              Images, video, audio, or PDF · up to {UPLOAD_LIMITS.maxFileSizeBytes / (1024 * 1024)}{" "}
+              MB
             </p>
           </div>
         </Field>
         {file && (
           <MediaSnapshotPreview
             file={file}
-            verificationState={hashState.status === "hashing" ? "hashing" : submitting ? "submitting" : "idle"}
+            verificationState={
+              hashState.status === "hashing" ? "hashing" : submitting ? "submitting" : "idle"
+            }
           />
         )}
         {hashState.status === "hashing" && <p className="muted">Computing SHA-256 hash…</p>}
         {hashState.status === "done" && (
-          <p className="muted">SHA-256: <code className="hash">{hashState.hash}</code></p>
+          <p className="muted">
+            SHA-256: <code className="hash">{hashState.hash}</code>
+          </p>
         )}
-        <Field id="title" label="Title (optional)" help="A short name helps you recognize this asset later." error={inputErrors.title}>
-          <input type="text" value={values.title} onChange={set("title")} maxLength={UPLOAD_LIMITS.titleMaxLength} {...inputProps("title")} />
+        <Field
+          id="title"
+          label="Title (optional)"
+          help="A short name helps you recognize this asset later."
+          error={inputErrors.title}
+        >
+          <input
+            type="text"
+            value={values.title}
+            onChange={set("title")}
+            maxLength={UPLOAD_LIMITS.titleMaxLength}
+            {...inputProps("title")}
+          />
         </Field>
-        <Field id="description" label="Description (optional)" help="Add useful context about what this file contains." error={inputErrors.description}>
-          <textarea value={values.description} onChange={set("description")} rows={3} {...inputProps("description")} />
+        <Field
+          id="description"
+          label="Description (optional)"
+          help="Add useful context about what this file contains."
+          error={inputErrors.description}
+        >
+          <textarea
+            value={values.description}
+            onChange={set("description")}
+            rows={3}
+            {...inputProps("description")}
+          />
         </Field>
-        <Field id="tags" label="Tags (optional)" help="Separate tags with commas." error={inputErrors.tags}>
+        <Field
+          id="tags"
+          label="Tags (optional)"
+          help="Separate tags with commas."
+          error={inputErrors.tags}
+        >
           <input type="text" value={values.tags} onChange={set("tags")} {...inputProps("tags")} />
         </Field>
       </fieldset>
 
       <fieldset>
         <legend>Manifest</legend>
-        <Field id="creator" label="Creator public key" help="Your Stellar address, starting with G." error={inputErrors.creator}>
+        <Field
+          id="creator"
+          label="Creator public key"
+          help="Your Stellar address, starting with G."
+          error={inputErrors.creator}
+        >
           <input
             type="text"
             value={values.creator}
@@ -531,25 +637,61 @@ export function UploadForm() {
             {...inputProps("creator")}
           />
         </Field>
-        <Field id="capturedAt" label="Created at" help="When the content was captured or made." error={inputErrors.capturedAt}>
-          <input type="datetime-local" value={values.capturedAt} onChange={set("capturedAt")} {...inputProps("capturedAt")} />
+        <Field
+          id="capturedAt"
+          label="Created at"
+          help="When the content was captured or made."
+          error={inputErrors.capturedAt}
+        >
+          <input
+            type="datetime-local"
+            value={values.capturedAt}
+            onChange={set("capturedAt")}
+            {...inputProps("capturedAt")}
+          />
         </Field>
-        <Field id="device" label="Device (optional)" help="The camera, phone, or tool used to create the content." error={inputErrors.device}>
-          <input type="text" value={values.device} onChange={set("device")} {...inputProps("device")} />
+        <Field
+          id="device"
+          label="Device (optional)"
+          help="The camera, phone, or tool used to create the content."
+          error={inputErrors.device}
+        >
+          <input
+            type="text"
+            value={values.device}
+            onChange={set("device")}
+            {...inputProps("device")}
+          />
         </Field>
-        <Field id="location" label="Location (optional)" help="Where the content was created. Leave blank if you prefer not to share it." error={inputErrors.location}>
-          <input type="text" value={values.location} onChange={set("location")} {...inputProps("location")} />
+        <Field
+          id="location"
+          label="Location (optional)"
+          help="Where the content was created. Leave blank if you prefer not to share it."
+          error={inputErrors.location}
+        >
+          <input
+            type="text"
+            value={values.location}
+            onChange={set("location")}
+            {...inputProps("location")}
+          />
         </Field>
-        <Field id="aiModel" label="AI model (optional)" help="If AI generated or edited this content, enter the tool or model name." error={inputErrors.aiModel}>
-          <input type="text" value={values.aiModel} onChange={set("aiModel")} {...inputProps("aiModel")} />
+        <Field
+          id="aiModel"
+          label="AI model (optional)"
+          help="If AI generated or edited this content, enter the tool or model name."
+          error={inputErrors.aiModel}
+        >
+          <input
+            type="text"
+            value={values.aiModel}
+            onChange={set("aiModel")}
+            {...inputProps("aiModel")}
+          />
         </Field>
       </fieldset>
 
-      <MetadataPreview
-        payload={payload}
-        validation={validation}
-        errors={allErrors}
-      />
+      <MetadataPreview payload={payload} validation={validation} errors={allErrors} />
 
       {resumable && !submitting && (
         <div className="notice" role="status">
@@ -560,23 +702,45 @@ export function UploadForm() {
           {resumable.status !== "expired" && (
             <div className="row">
               <label>
-                <input type="radio" name="resumeMode" checked={!restartUpload} onChange={() => setRestartUpload(false)} /> Resume where it stopped
+                <input
+                  type="radio"
+                  name="resumeMode"
+                  checked={!restartUpload}
+                  onChange={() => setRestartUpload(false)}
+                />{" "}
+                Resume where it stopped
               </label>
               <label>
-                <input type="radio" name="resumeMode" checked={restartUpload} onChange={() => setRestartUpload(true)} /> Start over
+                <input
+                  type="radio"
+                  name="resumeMode"
+                  checked={restartUpload}
+                  onChange={() => setRestartUpload(true)}
+                />{" "}
+                Start over
               </label>
             </div>
           )}
         </div>
       )}
       {submitting && uploadSession && uploadSession.status === "in_progress" && (
-        <div role="progressbar" aria-label="Upload progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={uploadSession.progress}>
+        <div
+          role="progressbar"
+          aria-label="Upload progress"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={uploadSession.progress}
+        >
           <progress max={100} value={uploadSession.progress} /> {uploadSession.progress}%
           {uploadSession.attempt > 1 && ` (attempt ${uploadSession.attempt})`}
         </div>
       )}
       <button type="submit" disabled={submitting || hashState.status === "hashing"}>
-        {submitting ? "Submitting…" : hashState.status === "hashing" ? "Hashing file…" : "Submit for verification"}
+        {submitting
+          ? "Submitting…"
+          : hashState.status === "hashing"
+            ? "Hashing file…"
+            : "Submit for verification"}
         {!submitting && hashState.status !== "hashing" && <ShortcutHint keys="Ctrl + Enter" />}
       </button>
     </form>

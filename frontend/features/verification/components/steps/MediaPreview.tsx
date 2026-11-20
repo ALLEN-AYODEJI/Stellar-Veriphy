@@ -72,25 +72,92 @@ function getCategory(mimeType: string): MediaCategory {
 // Sub-components
 // ---------------------------------------------------------------------------
 
-/** Image thumbnail with real dimensions loaded from the bitmap. */
+const IMAGE_ZOOM_LEVELS = [1, 1.5, 2, 3, 4] as const;
+
+const IMAGE_ZOOM_BUTTON_CLASS =
+  "inline-flex min-h-9 min-w-[2.25rem] items-center justify-center rounded-md border border-gray-300 bg-white px-2 text-sm font-medium text-gray-800 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700 dark:focus-visible:ring-offset-gray-900";
+
+/**
+ * Image thumbnail with real dimensions loaded from the bitmap, plus
+ * zoom in / zoom out / reset controls. Zoomed content scrolls inside a
+ * focusable region so keyboard users can pan without losing the controls.
+ */
 function ImagePreview({ objectUrl }: { objectUrl: string }) {
   const [dims, setDims] = useState<{ w: number; h: number } | null>(null);
+  const [zoomIndex, setZoomIndex] = useState(0);
+  const zoom = IMAGE_ZOOM_LEVELS[zoomIndex] ?? 1;
+  const isZoomed = zoom !== 1;
 
   useEffect(() => {
+    setZoomIndex(0);
     const img = new Image();
     img.onload = () => setDims({ w: img.naturalWidth, h: img.naturalHeight });
     img.src = objectUrl;
   }, [objectUrl]);
 
   return (
-    <div className="relative rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 bg-checkerboard">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={objectUrl} alt="Preview" className="max-h-64 w-full object-contain" />
-      {dims && (
-        <span className="absolute bottom-2 right-2 text-xs bg-black/60 text-white px-2 py-0.5 rounded">
-          {dims.w} × {dims.h}
+    <div className="space-y-2">
+      <div
+        role="toolbar"
+        aria-label="Image zoom controls"
+        className="flex flex-wrap items-center gap-2"
+      >
+        <button
+          type="button"
+          onClick={() => setZoomIndex((i) => Math.max(0, i - 1))}
+          disabled={zoomIndex === 0}
+          aria-label="Zoom out"
+          className={IMAGE_ZOOM_BUTTON_CLASS}
+        >
+          −
+        </button>
+        <span
+          aria-live="polite"
+          className="min-w-[3.5rem] text-center text-xs tabular-nums text-gray-700 dark:text-gray-300"
+        >
+          {Math.round(zoom * 100)}%
         </span>
-      )}
+        <button
+          type="button"
+          onClick={() => setZoomIndex((i) => Math.min(IMAGE_ZOOM_LEVELS.length - 1, i + 1))}
+          disabled={zoomIndex === IMAGE_ZOOM_LEVELS.length - 1}
+          aria-label="Zoom in"
+          className={IMAGE_ZOOM_BUTTON_CLASS}
+        >
+          +
+        </button>
+        <button
+          type="button"
+          onClick={() => setZoomIndex(0)}
+          disabled={!isZoomed}
+          aria-label="Reset zoom to 100%"
+          className={IMAGE_ZOOM_BUTTON_CLASS}
+        >
+          Reset
+        </button>
+      </div>
+
+      <div className="relative rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 bg-checkerboard">
+        <div
+          role="region"
+          tabIndex={0}
+          aria-label="Image preview. Scroll or use arrow keys to pan when zoomed."
+          className={`${isZoomed ? "max-h-96 overflow-auto" : ""} focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500`}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={objectUrl}
+            alt="Preview"
+            className={isZoomed ? "block h-auto max-w-none" : "max-h-64 w-full object-contain"}
+            style={isZoomed ? { width: `${zoom * 100}%` } : undefined}
+          />
+        </div>
+        {dims && (
+          <span className="absolute bottom-2 right-2 text-xs bg-black/60 text-white px-2 py-0.5 rounded">
+            {dims.w} × {dims.h}
+          </span>
+        )}
+      </div>
     </div>
   );
 }
@@ -278,8 +345,12 @@ function ExifPanel({ exif }: { exif: ExifField[] }) {
     <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800">
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
-          <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">Embedded image metadata</p>
-          <p className="text-xs text-gray-600 dark:text-gray-400">Sensitive fields stay hidden by default.</p>
+          <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+            Embedded image metadata
+          </p>
+          <p className="text-xs text-gray-600 dark:text-gray-400">
+            Sensitive fields stay hidden by default.
+          </p>
         </div>
         {sensitive.length > 0 && (
           <button
@@ -294,7 +365,12 @@ function ExifPanel({ exif }: { exif: ExifField[] }) {
 
       <div className="grid gap-3 md:grid-cols-2">
         {primary.map((field) => (
-          <MetaItem key={`${field.label}-${field.value}`} label={field.label} value={field.value} mono={false} />
+          <MetaItem
+            key={`${field.label}-${field.value}`}
+            label={field.label}
+            value={field.value}
+            mono={false}
+          />
         ))}
       </div>
 
@@ -305,7 +381,12 @@ function ExifPanel({ exif }: { exif: ExifField[] }) {
           </summary>
           <div className="mt-3 grid gap-3 md:grid-cols-2">
             {secondary.map((field) => (
-              <MetaItem key={`${field.label}-${field.value}`} label={field.label} value={field.value} mono={false} />
+              <MetaItem
+                key={`${field.label}-${field.value}`}
+                label={field.label}
+                value={field.value}
+                mono={false}
+              />
             ))}
           </div>
         </details>
@@ -314,7 +395,12 @@ function ExifPanel({ exif }: { exif: ExifField[] }) {
       {showSensitive && sensitive.length > 0 && (
         <div className="mt-3 grid gap-3 border-t border-gray-200 pt-3 md:grid-cols-2 dark:border-gray-700">
           {sensitive.map((field) => (
-            <MetaItem key={`${field.label}-${field.value}`} label={field.label} value={field.value} mono={false} />
+            <MetaItem
+              key={`${field.label}-${field.value}`}
+              label={field.label}
+              value={field.value}
+              mono={false}
+            />
           ))}
         </div>
       )}
