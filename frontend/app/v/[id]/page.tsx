@@ -14,6 +14,24 @@ import { parseVerificationUrlContext } from "@/lib/shareableUrl";
 type Params = Promise<{ id: string }>;
 type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>;
 
+function findRecord(id: string): VerificationRecord | undefined {
+  return getRecord(id) ?? SAMPLE_RECORDS.find((r) => r.manifest.contentHash.includes(id));
+}
+
+function describeStatus(status: string): string {
+  return status.replace(/_/g, " ");
+}
+
+/**
+ * Share-card metadata (#908).
+ *
+ * - Public proofs include the asset title and verification status so previews
+ *   identify what was verified. They never include the creator address, content
+ *   hash or attestation data.
+ * - Auditor views (authenticated mode) carry more detail, so their previews are
+ *   generic and the page is kept out of search indexes.
+ * - Unknown identifiers are not echoed back into metadata.
+ */
 export async function generateMetadata({
   params,
   searchParams,
@@ -24,12 +42,39 @@ export async function generateMetadata({
   const { id } = await params;
   const sParams = await searchParams;
   const context = parseVerificationUrlContext(sParams);
-  const record = getRecord(id) ?? SAMPLE_RECORDS.find((r) => r.manifest.contentHash.includes(id));
+  const record = findRecord(id);
 
-  const modeLabel = context.isAuthenticatedMode ? "[Auditor View]" : "[Public Verification]";
+  if (!record) {
+    return {
+      title: "Verification Record Not Found · StellarVeriphy",
+      description:
+        "No verification record matches this link. Check the identifier or verify a file on StellarVeriphy.",
+      robots: { index: false, follow: false },
+    };
+  }
+
+  if (context.isAuthenticatedMode) {
+    const title = "[Auditor View] Verification record · StellarVeriphy";
+    const description =
+      "Authenticated verification record on StellarVeriphy. Sign in with an authorized role to view details.";
+    return {
+      title,
+      description,
+      robots: { index: false, follow: false },
+      openGraph: { title, description, siteName: "StellarVeriphy", type: "website" },
+      twitter: { card: "summary", title, description },
+    };
+  }
+
+  const statusLabel = describeStatus(String(record.status));
+  const title = `[Public Verification] ${record.title} (${statusLabel}) · StellarVeriphy`;
+  const description = `Provenance verification for "${record.title}": status ${statusLabel}. Cryptographic proof published on StellarVeriphy.`;
   return {
-    title: `${modeLabel} ${record?.title ?? "Record Not Found"} · StellarVeriphy`,
-    description: `Cryptographic provenance verification proof for asset ${record?.title ?? id}`,
+    title,
+    description,
+    robots: { index: true, follow: true },
+    openGraph: { title, description, siteName: "StellarVeriphy", type: "website" },
+    twitter: { card: "summary", title, description },
   };
 }
 
@@ -112,11 +157,10 @@ export default async function ShareableVerificationPage({
 }) {
   const { id } = await params;
   const sParams = await searchParams;
-  const { mode, role, isAuthenticatedMode } = parseVerificationUrlContext(sParams);
+  const { role, isAuthenticatedMode } = parseVerificationUrlContext(sParams);
 
   // Lookup record by ID or partial content hash
-  const record: VerificationRecord | undefined =
-    getRecord(id) ?? SAMPLE_RECORDS.find((r) => r.manifest.contentHash.includes(id));
+  const record: VerificationRecord | undefined = findRecord(id);
 
   // Fallback view when record is not found
   if (!record) {
@@ -154,6 +198,140 @@ export default async function ShareableVerificationPage({
 
   const { manifest, cert, evidence, timeline } = record;
   const confidence = computeConfidence(record);
+
+  // Each tab is shareable via ?tab=<id> (#906). Ownership only exists once minted.
+  const tabs: AssetDetailTabItem[] = [
+    {
+      id: "evidence",
+      label: "Evidence",
+      content: (
+        <Section title="Verification evidence" emphasis>
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-indigo-100 pb-4 dark:border-indigo-900/60">
+            <span className="text-sm font-medium text-slate-700 dark:text-gray-200">
+              Confidence score
+            </span>
+            <ConfidenceScore result={confidence} size="lg" />
+          </div>
+          <div className="mt-4">
+            <ConfidenceExplanation result={confidence} />
+          </div>
+          <dl className="mt-5 divide-y divide-indigo-100 border-t border-indigo-100 dark:divide-indigo-900/60 dark:border-indigo-900/60">
+            {cert ? (
+              <>
+                <Field label="Certificate ID" mono>
+                  <ExpandableText text={cert.id} label="certificate ID" mono maxChars={40} />
+                </Field>
+                <Field label="Minted Date">{formatDate(cert.timestamp)}</Field>
+                <Field label="Storage Ref" mono>
+                  <ExpandableText
+                    text={cert.storageRef}
+                    label="storage reference"
+                    mono
+                    maxChars={48}
+                  />
+                </Field>
+              </>
+            ) : (
+              <div className="py-2 text-amber-600">Pending on-chain minting</div>
+            )}
+            {evidence && (
+              <>
+                <Field label="Attestation Enclave">{evidence.enclave}</Field>
+                <Field label="Attestation Hash" mono>
+                  <ExpandableText
+                    text={evidence.attestationHash}
+                    label="attestation hash"
+                    mono
+                    maxChars={48}
+                  />
+                </Field>
+              </>
+            )}
+          </dl>
+        </Section>
+      ),
+    },
+    {
+      id: "history",
+      label: "History",
+      content: (
+        <Section title="Verification History & Timeline">
+          {timeline.length > 0 ? (
+            <ol className="relative border-l border-slate-200 pl-4 space-y-4 dark:border-gray-800">
+              {timeline.map((evt, idx) => (
+                <li key={idx} className="relative">
+                  <div className="absolute -left-[21px] top-1.5 h-2.5 w-2.5 rounded-full bg-indigo-600 ring-4 ring-white dark:ring-gray-900" />
+                  <div className="text-xs text-slate-500">{formatDate(evt.timestamp)}</div>
+                  <div className="text-sm font-semibold dark:text-white">
+                    {EVENT_LABELS[evt.type] ?? evt.type}
+                  </div>
+                  {evt.detail && (
+                    <div className="text-xs text-slate-600 dark:text-gray-400 mt-0.5">
+                      {evt.detail}
+                    </div>
+                  )}
+                  {evt.txHash && (
+                    <div className="text-xs font-mono text-slate-400 mt-0.5 break-all">
+                      Tx: {evt.txHash}
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <p className="text-sm text-slate-500 dark:text-gray-400">
+              {record.status === "pending"
+                ? "Review updates will appear here after the independent verification service starts."
+                : "No review history is available yet."}
+            </p>
+          )}
+        </Section>
+      ),
+    },
+    {
+      id: "manifest",
+      label: "Manifest",
+      content: (
+        <Section title="Asset Manifest & Provenance" subdued>
+          <dl className="divide-y divide-slate-100 dark:divide-gray-800">
+            <Field label="Original creator" mono>
+              <span className="inline-flex max-w-full items-center gap-1">
+                <span className="min-w-0 break-all">{manifest.creator}</span>
+                <CopyButton text={manifest.creator} label="Copy creator wallet address" />
+              </span>
+            </Field>
+            <Field label="Content Hash" mono>
+              <ExpandableText text={manifest.contentHash} label="content hash" mono maxChars={48} />
+            </Field>
+            <Field label="Created At">{formatDate(manifest.timestamp)}</Field>
+            {manifest.metadata?.device && <Field label="Device">{manifest.metadata.device}</Field>}
+            {manifest.metadata?.location && (
+              <Field label="Location">{manifest.metadata.location}</Field>
+            )}
+            {manifest.metadata?.aiModel && (
+              <Field label="AI Model">{manifest.metadata.aiModel}</Field>
+            )}
+          </dl>
+        </Section>
+      ),
+    },
+    ...(cert
+      ? [
+          {
+            id: "ownership",
+            label: "Ownership",
+            content: (
+              <Section title="Ownership">
+                <OwnershipTransferPanel
+                  certificateId={record.id}
+                  initialOwner={cert.owner ?? cert.creator}
+                />
+              </Section>
+            ),
+          },
+        ]
+      : []),
+  ];
 
   return (
     <main className="mx-auto max-w-5xl px-4 py-10">
