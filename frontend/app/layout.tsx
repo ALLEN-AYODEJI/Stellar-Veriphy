@@ -3,31 +3,32 @@ import "./globals.css";
 import { GeistMono } from "geist/font/mono";
 import { GeistSans } from "geist/font/sans";
 import type { Metadata } from "next";
-import SiteHeader from "@/components/SiteHeader";
 
 import { WizardProvider } from "@/app/context/WizardContext";
+// #848 — detect unsupported browser capabilities and surface guidance
+import { BrowserCapabilityBanner } from "@/components/BrowserCapabilityBanner";
 import { ConsentBanner } from "@/components/ConsentBanner";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { KeyboardShortcutsProvider } from "@/components/KeyboardShortcutsProvider";
 import { MaintenanceBanner } from "@/components/MaintenanceBanner";
 import { NotificationProvider } from "@/components/notifications";
+import { OfflineStatusIndicator } from "@/components/OfflineStatusIndicator";
 import { OnboardingFlow } from "@/components/onboarding/OnboardingFlow";
 import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
 import { PWAUpdatePrompt } from "@/components/PWAUpdatePrompt";
+import SiteHeader from "@/components/SiteHeader";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { ToastProvider } from "@/components/ToastProvider";
 import { HelpSearchOverlay } from "@/components/ui/HelpSearchOverlay";
-import { ScrollToTop } from "@/components/ui/ScrollToTop";
 import { RouteScrollRestoration } from "@/components/ui/RouteScrollRestoration";
+import { ScrollToTop } from "@/components/ui/ScrollToTop";
 import { TutorialOverlay } from "@/components/ui/TutorialOverlay";
 // #442 — import centralised constants instead of duplicating them here
 import { SITE_DESCRIPTION, SITE_NAME, SITE_URL } from "@/config/app";
 import { AuthSessionProvider } from "@/context/AuthSessionContext";
+import { CacheInvalidationProvider } from "@/context/CacheInvalidationContext";
 import { HelpProvider } from "@/context/HelpContext";
 import { WalletProvider } from "@/context/WalletContext";
-import { CacheInvalidationProvider } from "@/context/CacheInvalidationContext";
-// #848 — detect unsupported browser capabilities and surface guidance
-import { BrowserCapabilityBanner } from "@/components/BrowserCapabilityBanner";
 // #440 — wrap application with React Query provider
 import { ReactQueryProvider } from "@/lib/queryClient";
 import { SkipToContentLink } from "@/utils/accessibility";
@@ -107,6 +108,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                           <ToastProvider>
                             {/* #787 — site-wide notice while maintenance mode is on */}
                             <MaintenanceBanner />
+                            <OfflineStatusIndicator />
                             {/* #848 — dismissible banner naming missing browser capabilities */}
                             <BrowserCapabilityBanner />
                             <SiteHeader />
