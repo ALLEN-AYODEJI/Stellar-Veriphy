@@ -1,13 +1,13 @@
-import type { Metadata } from "next";
-import Link from "next/link";
 import { computeConfidence } from "@stellarveriphy/shared/scoring";
 import type { ProvenanceEventType, VerificationRecord } from "@stellarveriphy/shared/types";
-import ConfidenceExplanation from "@/components/ConfidenceExplanation";
-import ConfidenceScore from "@/components/ConfidenceScore";
-import { CopyButton } from "@/components/CopyButton";
+import type { Metadata } from "next";
+import Link from "next/link";
+
 import { OwnershipTransferPanel } from "@/components/certificates/OwnershipTransferPanel";
+import { CopyButton } from "@/components/CopyButton";
 import StatusBadge from "@/components/StatusBadge";
 import Breadcrumbs from "@/components/ui/Breadcrumbs";
+import { VerificationResultSummary } from "@/components/verification/VerificationResultSummary";
 import { getRecord, SAMPLE_RECORDS } from "@/lib/sample-records";
 import { parseVerificationUrlContext } from "@/lib/shareableUrl";
 
@@ -44,7 +44,9 @@ const EVENT_LABELS: Record<ProvenanceEventType, string> = {
 
 function formatDate(iso: string | number) {
   const date = typeof iso === "number" ? new Date(iso * 1000) : new Date(iso);
-  return date.toLocaleString("en", { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" }) + " UTC";
+  return (
+    date.toLocaleString("en", { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" }) + " UTC"
+  );
 }
 
 function Section({
@@ -78,11 +80,23 @@ function Section({
   );
 }
 
-function Field({ label, children, mono }: { label: string; children: React.ReactNode; mono?: boolean }) {
+function Field({
+  label,
+  children,
+  mono,
+}: {
+  label: string;
+  children: React.ReactNode;
+  mono?: boolean;
+}) {
   return (
     <div className="py-2.5 sm:grid sm:grid-cols-3 sm:gap-4">
-      <dt className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-gray-400">{label}</dt>
-      <dd className={`mt-1 text-sm sm:col-span-2 sm:mt-0 ${mono ? "font-mono text-xs break-all" : ""} dark:text-gray-200`}>
+      <dt className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-gray-400">
+        {label}
+      </dt>
+      <dd
+        className={`mt-1 text-sm sm:col-span-2 sm:mt-0 ${mono ? "font-mono text-xs break-all" : ""} dark:text-gray-200`}
+      >
         {children}
       </dd>
     </div>
@@ -116,7 +130,8 @@ export default async function ShareableVerificationPage({
             Verification Record Not Found
           </h1>
           <p className="mt-2 text-sm text-slate-600 dark:text-gray-400">
-            No verification record or certificate matches identifier &ldquo;<span className="font-mono text-indigo-600 dark:text-indigo-400">{id}</span>&rdquo;.
+            No verification record or certificate matches identifier &ldquo;
+            <span className="font-mono text-indigo-600 dark:text-indigo-400">{id}</span>&rdquo;.
           </p>
           <div className="mt-6 flex flex-wrap justify-center gap-3">
             <Link
@@ -142,7 +157,9 @@ export default async function ShareableVerificationPage({
 
   return (
     <main className="mx-auto max-w-5xl px-4 py-10">
-      <Breadcrumbs items={[{ label: "Verify", href: "/verify" }, { label: "Verification result" }]} />
+      <Breadcrumbs
+        items={[{ label: "Verify", href: "/verify" }, { label: "Verification result" }]}
+      />
       {/* Contextual permissions banner */}
       <div
         className={`mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 rounded-xl p-4 border text-sm ${
@@ -180,9 +197,7 @@ export default async function ShareableVerificationPage({
           <h1 className="mt-1 text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
             {record.title}
           </h1>
-          <p className="mt-1 text-sm text-slate-500">
-            Created {formatDate(manifest.timestamp)}
-          </p>
+          <p className="mt-1 text-sm text-slate-500">Created {formatDate(manifest.timestamp)}</p>
         </div>
 
         <div className="flex items-center gap-2">
@@ -201,20 +216,20 @@ export default async function ShareableVerificationPage({
         </div>
       </header>
 
+      {/* Outcome first: result, grouped evidence and next steps */}
+      <div className="mt-6">
+        <VerificationResultSummary
+          status={record.status}
+          confidence={confidence}
+          hasCertificate={Boolean(cert)}
+        />
+      </div>
+
       {/* Grid */}
       <div className="mt-6 grid gap-4 lg:grid-cols-3">
         <div className="space-y-4 lg:col-span-2">
           <Section title="Verification evidence" emphasis>
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-indigo-100 pb-4 dark:border-indigo-900/60">
-              <span className="text-sm font-medium text-slate-700 dark:text-gray-200">
-                Confidence score
-              </span>
-              <ConfidenceScore result={confidence} size="lg" />
-            </div>
-            <div className="mt-4">
-              <ConfidenceExplanation result={confidence} />
-            </div>
-            <dl className="mt-5 divide-y divide-indigo-100 border-t border-indigo-100 dark:divide-indigo-900/60 dark:border-indigo-900/60">
+            <dl className="divide-y divide-indigo-100 dark:divide-indigo-900/60">
               {cert ? (
                 <>
                   <Field label="Certificate ID" mono>
@@ -251,7 +266,9 @@ export default async function ShareableVerificationPage({
                       {EVENT_LABELS[evt.type] ?? evt.type}
                     </div>
                     {evt.detail && (
-                      <div className="text-xs text-slate-600 dark:text-gray-400 mt-0.5">{evt.detail}</div>
+                      <div className="text-xs text-slate-600 dark:text-gray-400 mt-0.5">
+                        {evt.detail}
+                      </div>
                     )}
                     {evt.txHash && (
                       <div className="text-xs font-mono text-slate-400 mt-0.5 break-all">
