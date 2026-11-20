@@ -36,6 +36,8 @@ const config = {
       testPathIgnorePatterns: ["/node_modules/", "\\.bench\\.test\\.tsx?$"],
       moduleNameMapper: {
         "^@/(.*)$": "<rootDir>/$1",
+        // Matches the package "exports" map: ./scoring is a file, not a directory index.
+        "^@stellarveriphy/shared/scoring$": "<rootDir>/../packages/shared/scoring/confidence.ts",
         "^@stellarveriphy/shared/(.*)$": "<rootDir>/../packages/shared/$1",
         "\\.(css|less|scss|sass)$": "<rootDir>/__mocks__/styleMock.js",
         "\\.(png|jpg|jpeg|gif|svg|ico|webp)$": "<rootDir>/__mocks__/fileMock.js",
