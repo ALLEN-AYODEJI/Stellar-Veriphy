@@ -17,6 +17,7 @@
 
 import { useId, useState } from "react";
 
+import { RequiredIndicator } from "@/components/ui/FormIndicators";
 import { useRaiseDispute } from "@/hooks/useDispute";
 import type { DisputeEvidence, DisputeTrigger, RaiseDisputeRequest } from "@/types/dispute";
 
@@ -299,7 +300,7 @@ export default function DisputeSubmissionForm({
           htmlFor={`${formId}-cert`}
           className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1"
         >
-          Certificate ID <span aria-hidden="true" className="text-red-500">*</span>
+          Certificate ID <RequiredIndicator />
         </label>
         <input
           id={`${formId}-cert`}
@@ -325,7 +326,7 @@ export default function DisputeSubmissionForm({
           htmlFor={`${formId}-hash`}
           className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1"
         >
-          Content hash <span aria-hidden="true" className="text-red-500">*</span>
+          Content hash <RequiredIndicator />
         </label>
         <input
           id={`${formId}-hash`}
@@ -348,7 +349,7 @@ export default function DisputeSubmissionForm({
       {/* Trigger */}
       <fieldset>
         <legend className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
-          Reason for dispute <span aria-hidden="true" className="text-red-500">*</span>
+          Reason for dispute <RequiredIndicator />
         </legend>
         <div className="grid gap-2 sm:grid-cols-2">
           {TRIGGER_OPTIONS.map((opt) => (
@@ -381,7 +382,7 @@ export default function DisputeSubmissionForm({
           htmlFor={`${formId}-summary`}
           className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1"
         >
-          Summary <span aria-hidden="true" className="text-red-500">*</span>
+          Summary <RequiredIndicator />
         </label>
         <textarea
           id={`${formId}-summary`}
@@ -492,7 +493,7 @@ export default function DisputeSubmissionForm({
                 htmlFor={`${formId}-ev-desc`}
                 className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1"
               >
-                Description <span aria-hidden="true" className="text-red-500">*</span>
+                Description <RequiredIndicator />
               </label>
               <input
                 id={`${formId}-ev-desc`}

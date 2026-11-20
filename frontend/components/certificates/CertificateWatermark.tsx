@@ -17,6 +17,8 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import { Modal } from "@/components/ui/Modal";
+
 export type WatermarkPosition =
   | "top-left"
   | "top-center"
@@ -42,6 +44,19 @@ const POSITIONS: WatermarkPosition[] = [
 
 const CANVAS_W = 640;
 const CANVAS_H = 452; // ~A4 aspect
+// Horizontal margin kept clear of text so long values wrap to the page, not off it.
+const CANVAS_MARGIN = 48;
+
+const PRINT_SHEET_ID = "certificate-print-sheet";
+
+// Print-only rules: hide the app shell and modal chrome, print just the sheet.
+const PRINT_STYLES = `
+@media print {
+  @page { margin: 12mm; }
+  body * { visibility: hidden !important; }
+  #${PRINT_SHEET_ID}, #${PRINT_SHEET_ID} * { visibility: visible !important; }
+  #${PRINT_SHEET_ID} { position: absolute; left: 0; top: 0; width: 100%; box-shadow: none !important; }
+}`;
 
 export interface CertificateWatermarkProps {
   certificateId?: string;
@@ -92,7 +107,12 @@ function drawCertificate(ctx: CanvasRenderingContext2D, certificateId: string) {
 
   ctx.font = "14px monospace";
   ctx.fillStyle = "#6b7280";
-  ctx.fillText(`Certificate ID: ${certificateId}`, CANVAS_W / 2, CANVAS_H - 40);
+  ctx.fillText(
+    `Certificate ID: ${certificateId}`,
+    CANVAS_W / 2,
+    CANVAS_H - 40,
+    CANVAS_W - CANVAS_MARGIN
+  );
 }
 
 function drawWatermark(
@@ -111,7 +131,7 @@ function drawWatermark(
   ctx.textBaseline = baseline;
   ctx.translate(x, y);
   ctx.rotate(position === "center" ? -0.35 : 0);
-  ctx.fillText(text, 0, 0);
+  ctx.fillText(text, 0, 0, CANVAS_W - CANVAS_MARGIN);
   ctx.restore();
 }
 
@@ -145,10 +165,18 @@ export function CertificateWatermark({
     }, "image/png");
   };
 
-  const handleExportPdf = () => {
-    // No PDF library is bundled in the frontend yet — fall back to the
-    // browser print dialog (users can "Save as PDF"), matching the pattern
-    // used by CertificateHistoryTimelineView's exportAsPDF().
+  // Snapshot of the exact canvas that will be printed, shown in the preview modal.
+  const [printPreviewSrc, setPrintPreviewSrc] = useState<string | null>(null);
+
+  const handleOpenPrintPreview = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    setPrintPreviewSrc(canvas.toDataURL("image/png"));
+  };
+
+  // No PDF library is bundled in the frontend yet, so printing goes through the
+  // browser dialog, where "Save as PDF" produces the file.
+  const handlePrint = () => {
     window.print();
   };
 
@@ -220,13 +248,59 @@ export function CertificateWatermark({
             Download PNG
           </button>
           <button
-            onClick={handleExportPdf}
-            className="rounded-md px-4 py-2 text-sm font-medium text-gray-600 ring-1 ring-gray-300 hover:bg-gray-50 dark:text-gray-300 dark:ring-gray-600 dark:hover:bg-gray-800"
+            type="button"
+            onClick={handleOpenPrintPreview}
+            aria-haspopup="dialog"
+            className="rounded-md px-4 py-2 text-sm font-medium text-gray-600 ring-1 ring-gray-300 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-gray-300 dark:ring-gray-600 dark:hover:bg-gray-800"
           >
-            Export as PDF
+            Print preview
           </button>
         </div>
       </div>
+
+      <Modal
+        isOpen={printPreviewSrc !== null}
+        onClose={() => setPrintPreviewSrc(null)}
+        title="Print preview"
+        className="max-w-2xl"
+      >
+        <style>{PRINT_STYLES}</style>
+        <div className="space-y-4 p-6">
+          <p className="text-sm text-gray-600 dark:text-gray-300">
+            This is the page that will print. Use your browser&apos;s print dialog and choose
+            &quot;Save as PDF&quot; to keep a digital copy.
+          </p>
+          {printPreviewSrc && (
+            <div
+              id={PRINT_SHEET_ID}
+              className="mx-auto w-full overflow-hidden rounded border border-gray-200 bg-white shadow-sm"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={printPreviewSrc}
+                alt={`Print preview of certificate ${certificateId}`}
+                className="block h-auto w-full max-w-full"
+              />
+            </div>
+          )}
+          <div className="flex flex-wrap justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setPrintPreviewSrc(null)}
+              className="rounded-md px-4 py-2 text-sm font-medium text-gray-700 ring-1 ring-gray-300 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-gray-200 dark:ring-gray-600 dark:hover:bg-gray-800"
+            >
+              Close
+            </button>
+            <button
+              type="button"
+              onClick={handlePrint}
+              className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+            >
+              Print
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

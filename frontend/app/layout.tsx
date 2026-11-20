@@ -14,6 +14,7 @@ import { MaintenanceBanner } from "@/components/MaintenanceBanner";
 import { NotificationProvider } from "@/components/notifications";
 import { OfflineStatusIndicator } from "@/components/OfflineStatusIndicator";
 import { OnboardingFlow } from "@/components/onboarding/OnboardingFlow";
+import { WelcomeBanner } from "@/components/onboarding/WelcomeBanner";
 import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
 import { PWAUpdatePrompt } from "@/components/PWAUpdatePrompt";
 import SiteHeader from "@/components/SiteHeader";
@@ -108,7 +109,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                           <ToastProvider>
                             {/* #787 — site-wide notice while maintenance mode is on */}
                             <MaintenanceBanner />
-                            <OfflineStatusIndicator />
+                            {/* #894 — dismissible first-run banner pointing creators at their next action */}
+                            <WelcomeBanner />
                             {/* #848 — dismissible banner naming missing browser capabilities */}
                             <BrowserCapabilityBanner />
                             <SiteHeader />

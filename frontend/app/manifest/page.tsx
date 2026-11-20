@@ -3,13 +3,13 @@
 import { ContentManifest } from "@stellarveriphy/shared/types";
 import { useEffect, useState } from "react";
 
+import { useToast } from "@/app/context/ToastContext";
 import { KeyValueBuilder, type MetadataValue } from "@/components/KeyValueBuilder";
 import { ManifestPreview } from "@/components/ManifestPreview";
 import { AutoSaveIndicator } from "@/components/ui/AutoSaveIndicator";
 import { FormInput } from "@/components/ui/FormInput";
 import { HelpIcon } from "@/components/ui/HelpIcon";
 import { useAutoSave } from "@/hooks/useAutoSave";
-import { useToast } from "@/app/context/ToastContext";
 import { ALL_TEMPLATES, loadTemplate, type TemplateId } from "@/utils/manifestTemplates";
 import {
   downloadJSON,
@@ -33,23 +33,22 @@ export default function ManifestPage() {
   const creator = manifest.creator || "";
   const timestamp = manifest.timestamp?.slice(0, 16) || "";
 
-  const { state: autoSaveState, clearSaved } = useAutoSave({
+  const {
+    state: autoSaveState,
+    clearSaved,
+    restore,
+  } = useAutoSave({
     key: "manifest-form",
     data: manifest,
     interval: 20000,
   });
 
+  // Restoring through the hook marks the restored draft as the saved baseline,
+  // so it does not show as "Unsaved changes" on load.
   useEffect(() => {
-    const saved = localStorage.getItem("manifest-form");
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved) as Partial<ContentManifest>;
-        setManifest(parsed);
-      } catch {
-        /* noop */
-      }
-    }
-  }, []);
+    const restored = restore();
+    if (restored) setManifest(restored as Partial<ContentManifest>);
+  }, [restore]);
 
   const handleChange = (field: keyof ContentManifest, value: ContentManifest[typeof field]) => {
     setManifest((prev) => ({ ...prev, [field]: value }));

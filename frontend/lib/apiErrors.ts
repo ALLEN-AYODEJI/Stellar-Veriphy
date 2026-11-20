@@ -78,7 +78,10 @@ function stringValue(value: unknown): string | undefined {
 /** Extracts access-denied details from a response body (`details` or top-level fields). */
 export function parseAccessDenied(body: unknown): AccessDeniedDetails | undefined {
   const b = (body && typeof body === "object" ? body : {}) as Record<string, unknown>;
-  const details = (b.details && typeof b.details === "object" ? b.details : {}) as Record<string, unknown>;
+  const details = (b.details && typeof b.details === "object" ? b.details : {}) as Record<
+    string,
+    unknown
+  >;
 
   const info: AccessDeniedDetails = {
     requiredPermission: stringValue(details.requiredPermission ?? b.requiredPermission),
@@ -127,7 +130,10 @@ function formatWait(seconds: number): string {
 /** Reads rate-limit metadata from the body (preferred) and the standard headers. */
 export function parseRateLimit(res: Response, body: unknown): RateLimitInfo | undefined {
   const b = (body && typeof body === "object" ? body : {}) as Record<string, unknown>;
-  const fromBody = (b.rateLimit && typeof b.rateLimit === "object" ? b.rateLimit : {}) as Record<string, unknown>;
+  const fromBody = (b.rateLimit && typeof b.rateLimit === "object" ? b.rateLimit : {}) as Record<
+    string,
+    unknown
+  >;
 
   const info: RateLimitInfo = {
     limit: positiveNumber(fromBody.limit ?? res.headers.get("X-RateLimit-Limit")),
@@ -164,10 +170,15 @@ export function networkError(requestId?: string): ApiError {
 export function apiErrorFromResponse(res: Response, body: unknown): ApiError {
   const b = (body && typeof body === "object" ? body : {}) as Record<string, unknown>;
   const requestId =
-    (typeof b.requestId === "string" ? b.requestId : undefined) ?? res.headers.get("X-Request-Id") ?? undefined;
-  const code = typeof b.code === "string" ? b.code : typeof b.status === "string" ? b.status : undefined;
+    (typeof b.requestId === "string" ? b.requestId : undefined) ??
+    res.headers.get("X-Request-Id") ??
+    undefined;
+  const code =
+    typeof b.code === "string" ? b.code : typeof b.status === "string" ? b.status : undefined;
   const serverMessage =
-    (typeof b.message === "string" && b.message) || (typeof b.error === "string" && b.error) || undefined;
+    (typeof b.message === "string" && b.message) ||
+    (typeof b.error === "string" && b.error) ||
+    undefined;
 
   if (res.status === 429) {
     const rateLimit = parseRateLimit(res, body);
@@ -237,7 +248,10 @@ export interface ErrorDescription {
 }
 
 /** Maps any thrown value to copy suitable for an error state with a retry action. */
-export function describeError(error: unknown, fallback = "Something went wrong."): ErrorDescription {
+export function describeError(
+  error: unknown,
+  fallback = "Something went wrong."
+): ErrorDescription {
   if (error instanceof ApiError) {
     if (error.isRateLimited) {
       return {
@@ -249,7 +263,12 @@ export function describeError(error: unknown, fallback = "Something went wrong."
       };
     }
     if (error.isNetworkError) {
-      return { title: "Connection problem", message: error.message, retryable: true, requestId: error.requestId };
+      return {
+        title: "Connection problem",
+        message: error.message,
+        retryable: true,
+        requestId: error.requestId,
+      };
     }
     if (error.isServiceUnavailable) {
       return {
@@ -258,8 +277,11 @@ export function describeError(error: unknown, fallback = "Something went wrong."
         retryable: true,
         retryAfterSeconds: error.retryAfterSeconds,
         requestId: error.requestId,
+      };
+    }
     if (error.isAccessDenied) {
-      const permission = error.accessDenied?.requiredPermission ?? error.accessDenied?.requiredScope;
+      const permission =
+        error.accessDenied?.requiredPermission ?? error.accessDenied?.requiredScope;
       return {
         title: "Access restricted",
         message:

@@ -8,7 +8,7 @@
  * results.
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { CertificateFilterPanel } from "@/components/certificates/CertificateFilterPanel";
 import {
@@ -20,8 +20,14 @@ import { SearchEmptyState } from "@/components/search/SearchEmptyState";
 import { Breadcrumbs } from "@/components/ui/Breadcrumbs";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { useCertificateSearch } from "@/hooks/useCertificateQueries";
-import { useOnlineStatus } from "@/hooks/useOnlineStatus";
+import {
+  forgetRememberedFilters,
+  hasActiveFilters,
+  loadRememberedFilters,
+  rememberFilters,
+} from "@/lib/certificateFilterMemory";
 import type { CertificateSearchFilters } from "@/services/certificateVerificationService";
+import { useWalletPublicKey } from "@/store/useWalletStore";
 
 const PAGE_SIZE = 10;
 const TABLE_COLUMNS = ["ID", "Creator", "Status", "Level", "Date"];
@@ -87,11 +93,42 @@ function download(filename: string, content: string, type: string): void {
   URL.revokeObjectURL(url);
 }
 
+const DEFAULT_FILTERS: CertificateSearchFilters = { offset: 0, limit: PAGE_SIZE };
+
 export default function CertificatesPage() {
-  const [filters, setFilters] = useState<CertificateSearchFilters>({
-    offset: 0,
-    limit: PAGE_SIZE,
-  });
+  // Filters are remembered per connected account (or anonymous visitor).
+  const scope = useWalletPublicKey();
+  const [filters, setFiltersState] = useState<CertificateSearchFilters>(DEFAULT_FILTERS);
+  const [restored, setRestored] = useState(false);
+
+  // Restore after mount so server and client render the same first pass.
+  useEffect(() => {
+    const remembered = loadRememberedFilters(scope);
+    if (remembered) {
+      setFiltersState({ ...remembered, offset: 0, limit: PAGE_SIZE });
+      setRestored(true);
+    } else {
+      setFiltersState(DEFAULT_FILTERS);
+      setRestored(false);
+    }
+  }, [scope]);
+
+  // Only user-initiated changes are written, so switching accounts never
+  // overwrites another account's remembered filters.
+  const setFilters = (
+    update: CertificateSearchFilters | ((prev: CertificateSearchFilters) => CertificateSearchFilters)
+  ) => {
+    const next = typeof update === "function" ? update(filters) : update;
+    setFiltersState(next);
+    setRestored(false);
+    rememberFilters(scope, next);
+  };
+
+  const clearRememberedFilters = () => {
+    forgetRememberedFilters(scope);
+    setFiltersState(DEFAULT_FILTERS);
+    setRestored(false);
+  };
 
   const { data, isLoading, isError, isFetching, refetch } = useCertificateSearch(filters);
   const isOffline = !useOnlineStatus();
@@ -131,6 +168,28 @@ export default function CertificatesPage() {
             combinations as presets and export matching results.
           </p>
         </div>
+
+        {restored || hasActiveFilters(filters) ? (
+          <div
+            role="status"
+            className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-800 bg-slate-900/60 px-4 py-3 text-sm text-slate-300"
+          >
+            <span>
+              {restored
+                ? "Showing filters you applied earlier in this session."
+                : "Filters are remembered for this session."}
+            </span>
+            {hasActiveFilters(filters) ? (
+              <button
+                type="button"
+                onClick={clearRememberedFilters}
+                className="rounded-md border border-slate-700 px-3 py-1.5 text-slate-200 hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+              >
+                Clear remembered filters
+              </button>
+            ) : null}
+          </div>
+        ) : null}
 
         <CertificateFilterPanel filters={filters} onChange={setFilters} />
 
