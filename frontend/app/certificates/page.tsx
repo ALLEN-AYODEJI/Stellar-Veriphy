@@ -16,6 +16,7 @@ import {
   CertificateStatusBadge,
 } from "@/components/certificates/CertificateStatusBadge";
 import { Header } from "@/components/Header";
+import { SearchEmptyState } from "@/components/search/SearchEmptyState";
 import { Breadcrumbs } from "@/components/ui/Breadcrumbs";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { useCertificateSearch } from "@/hooks/useCertificateQueries";
@@ -129,8 +130,14 @@ export default function CertificatesPage() {
     setRestored(false);
   };
 
-  const { data, isLoading, isError } = useCertificateSearch(filters);
+  const { data, isLoading, isError, isFetching, refetch } = useCertificateSearch(filters);
+  const isOffline = !useOnlineStatus();
   const result = data?.success ? data.data : undefined;
+  // A search that reports success: false is a failure, not an empty result (#912).
+  const searchFailed = isError || data?.success === false;
+  const hasActiveFilters = Object.entries(filters).some(
+    ([key, value]) => key !== "offset" && key !== "limit" && value !== undefined && value !== "",
+  );
   const certificates = result?.certificates ?? [];
   const total = result?.total ?? 0;
   const offset = filters.offset ?? 0;
@@ -212,10 +219,23 @@ export default function CertificatesPage() {
           </div>
 
           {isLoading && <CertificateTableSkeleton />}
-          {isError && <p className="text-red-400">Failed to load certificates.</p>}
+          {!isLoading && searchFailed && (
+            <SearchEmptyState
+              variant="error"
+              noun="certificates"
+              offline={isOffline}
+              retrying={isFetching}
+              onRetry={() => void refetch()}
+            />
+          )}
 
-          {!isLoading && certificates.length === 0 && (
-            <p className="text-slate-400">No certificates match the current filters.</p>
+          {!isLoading && !searchFailed && certificates.length === 0 && (
+            <SearchEmptyState
+              variant="no-matches"
+              noun="certificates"
+              hasActiveFilters={hasActiveFilters}
+              onClearFilters={() => setFilters({ offset: 0, limit: PAGE_SIZE })}
+            />
           )}
 
           {certificates.length > 0 && (

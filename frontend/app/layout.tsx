@@ -12,6 +12,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { KeyboardShortcutsProvider } from "@/components/KeyboardShortcutsProvider";
 import { MaintenanceBanner } from "@/components/MaintenanceBanner";
 import { NotificationProvider } from "@/components/notifications";
+import { OfflineStatusIndicator } from "@/components/OfflineStatusIndicator";
 import { OnboardingFlow } from "@/components/onboarding/OnboardingFlow";
 import { WelcomeBanner } from "@/components/onboarding/WelcomeBanner";
 import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
