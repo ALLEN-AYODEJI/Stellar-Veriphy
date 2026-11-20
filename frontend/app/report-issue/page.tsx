@@ -8,15 +8,16 @@
  *   2. "Dispute a provenance record" — raises a content dispute via the API
  */
 
-import { useEffect, useState } from "react";
-import { useForm } from "react-hook-form";
 import { useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
 import { Suspense } from "react";
+import { useForm } from "react-hook-form";
 
+import DisputeSubmissionForm from "@/components/DisputeSubmissionForm";
 import { AutoSaveIndicator } from "@/components/ui/AutoSaveIndicator";
+import { RequiredIndicator } from "@/components/ui/FormIndicators";
 import { HelpIcon } from "@/components/ui/HelpIcon";
 import { useAutoSave } from "@/hooks/useAutoSave";
-import DisputeSubmissionForm from "@/components/DisputeSubmissionForm";
 
 // ─── Bug/Feature report form ─────────────────────────────────────────────────
 
@@ -127,7 +128,7 @@ function BugFeatureForm() {
       <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-6">
         <fieldset>
           <legend className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-            Issue Type <span aria-hidden="true" className="text-red-500">*</span>
+            Issue Type <RequiredIndicator />
           </legend>
           <div className="grid grid-cols-3 gap-3">
             {(["bug", "feature", "other"] as IssueType[]).map((type) => (
@@ -148,7 +149,7 @@ function BugFeatureForm() {
 
         <div>
           <label htmlFor="title" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
-            Title <span aria-hidden="true" className="text-red-500">*</span>
+            Title <RequiredIndicator />
             <HelpIcon content="Provide a concise summary that helps identify the issue at a glance." className="ml-1.5" />
           </label>
           <input
@@ -168,7 +169,7 @@ function BugFeatureForm() {
 
         <div>
           <label htmlFor="description" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
-            Description <span aria-hidden="true" className="text-red-500">*</span>
+            Description <RequiredIndicator />
           </label>
           <textarea
             id="description"
@@ -187,7 +188,7 @@ function BugFeatureForm() {
         {issueType === "bug" && (
           <div>
             <label htmlFor="stepsToReproduce" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
-              Steps to Reproduce <span aria-hidden="true" className="text-red-500">*</span>
+              Steps to Reproduce <RequiredIndicator />
             </label>
             <textarea
               id="stepsToReproduce"
