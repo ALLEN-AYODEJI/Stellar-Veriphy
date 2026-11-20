@@ -2,6 +2,10 @@
 
 import { useState } from "react";
 
+import { ProfileCompletenessPanel } from "@/components/profile/ProfileCompletenessPanel";
+
+type TrackedProfileField = "displayName" | "email" | "stellarAccount" | "bio";
+
 // Shared row layout: labels stack above fields on small screens and sit in a
 // fixed-width column on larger ones. The label's top padding equals the
 // control's padding plus border (0.5rem + 1px) so label text lines up with
@@ -61,6 +65,17 @@ function CheckboxRow({ id, label, hint, defaultChecked }: { id: string; label: s
 
 export default function SettingsForm() {
   const [saved, setSaved] = useState(false);
+  const [values, setValues] = useState<Record<TrackedProfileField, string>>({
+    displayName: "",
+    email: "",
+    stellarAccount: "",
+    bio: "",
+  });
+
+  const updateValue =
+    (id: TrackedProfileField) =>
+    (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+      setValues((prev) => ({ ...prev, [id]: e.target.value }));
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -69,10 +84,27 @@ export default function SettingsForm() {
   }
 
   return (
+    <div className="space-y-6">
+      <ProfileCompletenessPanel values={values} />
     <form onSubmit={handleSubmit} onChange={() => setSaved(false)} className="rounded-xl border border-slate-200 bg-white px-5 shadow-sm sm:px-8">
       <div className="divide-y divide-slate-100">
-        <TextRow id="displayName" label="Display name" autoComplete="name" placeholder="Jane Creator" />
-        <TextRow id="email" label="Email" type="email" autoComplete="email" hint="Used for verification status notifications." />
+        <TextRow
+          id="displayName"
+          label="Display name"
+          autoComplete="name"
+          placeholder="Jane Creator"
+          value={values.displayName}
+          onChange={updateValue("displayName")}
+        />
+        <TextRow
+          id="email"
+          label="Email"
+          type="email"
+          autoComplete="email"
+          hint="Used for verification status notifications."
+          value={values.email}
+          onChange={updateValue("email")}
+        />
         <TextRow
           id="stellarAccount"
           label="Stellar account"
@@ -82,6 +114,8 @@ export default function SettingsForm() {
           pattern="G[A-Z2-7]{55}"
           className={`${CONTROL} font-mono`}
           hint="Public key that signs your submissions. Must start with G."
+          value={values.stellarAccount}
+          onChange={updateValue("stellarAccount")}
         />
 
         <div className={ROW}>
@@ -105,7 +139,14 @@ export default function SettingsForm() {
             Bio
           </label>
           <div className="min-w-0">
-            <textarea id="bio" name="bio" rows={3} className={`${CONTROL} resize-y`} />
+            <textarea
+              id="bio"
+              name="bio"
+              rows={3}
+              className={`${CONTROL} resize-y`}
+              value={values.bio}
+              onChange={updateValue("bio")}
+            />
           </div>
         </div>
 
@@ -134,5 +175,6 @@ export default function SettingsForm() {
         </button>
       </div>
     </form>
+    </div>
   );
 }
