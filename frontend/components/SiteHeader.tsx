@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import { ShortcutHelpButton } from "@/components/ShortcutHelpButton";
+
 const NAV_LINKS = [
   { href: "/explore", label: "Explore" },
   { href: "/creator/upload-content", label: "Upload" },
@@ -13,17 +15,20 @@ export default function SiteHeader() {
         <Link href="/" className="font-semibold tracking-tight">
           StellarVeriphy
         </Link>
-        <nav aria-label="Main">
-          <ul className="flex gap-5 text-sm text-slate-600">
-            {NAV_LINKS.map((link) => (
-              <li key={link.href}>
-                <Link href={link.href} className="hover:text-slate-900 focus-visible:underline">
-                  {link.label}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </nav>
+        <div className="flex items-center gap-4">
+          <nav aria-label="Main">
+            <ul className="flex gap-5 text-sm text-slate-600">
+              {NAV_LINKS.map((link) => (
+                <li key={link.href}>
+                  <Link href={link.href} className="hover:text-slate-900 focus-visible:underline">
+                    {link.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </nav>
+          <ShortcutHelpButton />
+        </div>
       </div>
     </header>
   );

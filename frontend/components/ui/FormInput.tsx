@@ -4,6 +4,8 @@ import React from "react";
 
 import { cn } from "@/utils/cn";
 
+import { OptionalIndicator, RequiredIndicator } from "./FormIndicators";
+
 export type FormInputState = "default" | "error" | "success";
 
 export interface FormInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
@@ -13,6 +15,11 @@ export interface FormInputProps extends React.InputHTMLAttributes<HTMLInputEleme
   successText?: React.ReactNode;
   state?: FormInputState;
   showCharacterCount?: boolean;
+  /**
+   * Show a visible "(optional)" label on non-required fields. Use this when the
+   * surrounding form marks optional fields, so the difference is never ambiguous.
+   */
+  showOptional?: boolean;
 }
 
 const stateClasses: Record<FormInputState, string> = {
@@ -32,6 +39,7 @@ export const FormInput = React.forwardRef<HTMLInputElement, FormInputProps>(
       successText,
       state,
       showCharacterCount = false,
+      showOptional = false,
       maxLength,
       value,
       defaultValue,
@@ -65,11 +73,7 @@ export const FormInput = React.forwardRef<HTMLInputElement, FormInputProps>(
             className="block text-sm font-medium text-gray-900 dark:text-gray-100"
           >
             {label}
-            {required ? (
-              <span className="ml-1 text-red-600" aria-hidden="true">
-                *
-              </span>
-            ) : null}
+            {required ? <RequiredIndicator /> : showOptional ? <OptionalIndicator /> : null}
           </label>
         ) : null}
 

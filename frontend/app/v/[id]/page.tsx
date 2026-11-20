@@ -3,14 +3,11 @@ import type { ProvenanceEventType, VerificationRecord } from "@stellarveriphy/sh
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import AssetDetailTabs, { type AssetDetailTabItem } from "@/components/AssetDetailTabs";
 import { OwnershipTransferPanel } from "@/components/certificates/OwnershipTransferPanel";
-import ConfidenceExplanation from "@/components/ConfidenceExplanation";
-import ConfidenceScore from "@/components/ConfidenceScore";
 import { CopyButton } from "@/components/CopyButton";
 import StatusBadge from "@/components/StatusBadge";
 import Breadcrumbs from "@/components/ui/Breadcrumbs";
-import { ExpandableText } from "@/components/ui/ExpandableText";
+import { VerificationResultSummary } from "@/components/verification/VerificationResultSummary";
 import { getRecord, SAMPLE_RECORDS } from "@/lib/sample-records";
 import { parseVerificationUrlContext } from "@/lib/shareableUrl";
 
@@ -397,8 +394,113 @@ export default async function ShareableVerificationPage({
         </div>
       </header>
 
+      {/* Outcome first: result, grouped evidence and next steps */}
       <div className="mt-6">
-        <AssetDetailTabs tabs={tabs} />
+        <VerificationResultSummary
+          status={record.status}
+          confidence={confidence}
+          hasCertificate={Boolean(cert)}
+        />
+      </div>
+
+      {/* Grid */}
+      <div className="mt-6 grid gap-4 lg:grid-cols-3">
+        <div className="space-y-4 lg:col-span-2">
+          <Section title="Verification evidence" emphasis>
+            <dl className="divide-y divide-indigo-100 dark:divide-indigo-900/60">
+              {cert ? (
+                <>
+                  <Field label="Certificate ID" mono>
+                    {cert.id}
+                  </Field>
+                  <Field label="Minted Date">{formatDate(cert.timestamp)}</Field>
+                  <Field label="Storage Ref" mono>
+                    {cert.storageRef}
+                  </Field>
+                </>
+              ) : (
+                <div className="py-2 text-amber-600">Pending on-chain minting</div>
+              )}
+              {evidence && (
+                <>
+                  <Field label="Attestation Enclave">{evidence.enclave}</Field>
+                  <Field label="Attestation Hash" mono>
+                    {evidence.attestationHash}
+                  </Field>
+                </>
+              )}
+            </dl>
+          </Section>
+
+          {/* Timeline */}
+          <Section title="Verification History & Timeline">
+            {timeline.length > 0 ? (
+              <ol className="relative border-l border-slate-200 pl-4 space-y-4 dark:border-gray-800">
+                {timeline.map((evt, idx) => (
+                  <li key={idx} className="relative">
+                    <div className="absolute -left-[21px] top-1.5 h-2.5 w-2.5 rounded-full bg-indigo-600 ring-4 ring-white dark:ring-gray-900" />
+                    <div className="text-xs text-slate-500">{formatDate(evt.timestamp)}</div>
+                    <div className="text-sm font-semibold dark:text-white">
+                      {EVENT_LABELS[evt.type] ?? evt.type}
+                    </div>
+                    {evt.detail && (
+                      <div className="text-xs text-slate-600 dark:text-gray-400 mt-0.5">
+                        {evt.detail}
+                      </div>
+                    )}
+                    {evt.txHash && (
+                      <div className="text-xs font-mono text-slate-400 mt-0.5 break-all">
+                        Tx: {evt.txHash}
+                      </div>
+                    )}
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <p className="text-sm text-slate-500 dark:text-gray-400">
+                {record.status === "pending"
+                  ? "Review updates will appear here after the independent verification service starts."
+                  : "No review history is available yet."}
+              </p>
+            )}
+          </Section>
+        </div>
+
+        {/* Supporting details */}
+        <div className="space-y-4">
+          <Section title="Asset Manifest & Provenance" subdued>
+            <dl className="divide-y divide-slate-100 dark:divide-gray-800">
+              <Field label="Original creator" mono>
+                <span className="inline-flex max-w-full items-center gap-1">
+                  <span className="min-w-0 break-all">{manifest.creator}</span>
+                  <CopyButton text={manifest.creator} label="Copy creator wallet address" />
+                </span>
+              </Field>
+              <Field label="Content Hash" mono>
+                {manifest.contentHash}
+              </Field>
+              <Field label="Created At">{formatDate(manifest.timestamp)}</Field>
+              {manifest.metadata?.device && (
+                <Field label="Device">{manifest.metadata.device}</Field>
+              )}
+              {manifest.metadata?.location && (
+                <Field label="Location">{manifest.metadata.location}</Field>
+              )}
+              {manifest.metadata?.aiModel && (
+                <Field label="AI Model">{manifest.metadata.aiModel}</Field>
+              )}
+            </dl>
+          </Section>
+
+          {cert && (
+            <Section title="Ownership">
+              <OwnershipTransferPanel
+                certificateId={record.id}
+                initialOwner={cert.owner ?? cert.creator}
+              />
+            </Section>
+          )}
+        </div>
       </div>
     </main>
   );

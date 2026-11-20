@@ -16,6 +16,7 @@ import {
   validateExportLimit,
   validateRecords,
 } from "@stellarveriphy/shared/utils/provenanceExport";
+import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
 
 import { useWallet } from "@/context/WalletContext";
@@ -25,7 +26,28 @@ interface BulkExportPanelProps {
   records: ProvenanceRecord[];
 }
 
-type QueueStatus = "queued" | "preparing" | "ready" | "started" | "complete" | "failed";
+type QueueStatus =
+  | "queued"
+  | "preparing"
+  | "ready"
+  | "downloading"
+  | "started"
+  | "complete"
+  | "failed"
+  | "download_failed";
+
+const QUEUE_STATUS_LABELS: Record<QueueStatus, string> = {
+  queued: "Queued",
+  preparing: "Preparing",
+  ready: "Ready",
+  downloading: "Downloading…",
+  started: "Download started",
+  complete: "Marked saved",
+  failed: "Preparation failed",
+  download_failed: "Download failed",
+};
+
+const SUPPORT_HREF = "/report-issue";
 
 interface ExportQueueItem {
   id: string;
@@ -38,7 +60,7 @@ interface ExportQueueItem {
   totalParts: number;
   status: QueueStatus;
   blob?: Blob;
-  error?: string;
+  error?: string | undefined;
 }
 
 function download(blob: Blob, fileName: string) {
@@ -64,6 +86,9 @@ export function BulkExportPanel({ records }: BulkExportPanelProps) {
   const [queue, setQueue] = useState<ExportQueueItem[]>([]);
   const [isPreparing, setIsPreparing] = useState(false);
   const preparingRef = useRef(false);
+  // Ids with a download in flight. A ref (not state) so a double click is
+  // rejected before React re-renders the disabled button.
+  const downloadingRef = useRef(new Set<string>());
 
   const scope = role === "admin" ? "all" : "own";
   const selected = useMemo(() => {
@@ -79,7 +104,8 @@ export function BulkExportPanel({ records }: BulkExportPanelProps) {
   if (role === "guest") {
     return (
       <div className="rounded-xl border border-amber-300 bg-amber-50 p-5 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-900/30 dark:text-amber-200">
-        Connect a wallet to export provenance records. Creators can export the records they own; administrators can export every record.
+        Connect a wallet to export provenance records. Creators can export the records they own;
+        administrators can export every record.
       </div>
     );
   }
@@ -171,28 +197,30 @@ export function BulkExportPanel({ records }: BulkExportPanelProps) {
     void prepareItems(items);
   };
 
-  const startDownload = (item: ExportQueueItem) => {
-    if (!item.blob) return;
+  const setItemStatus = (id: string, patch: Partial<ExportQueueItem>) => {
+    setQueue((current) =>
+      current.map((queued) => (queued.id === id ? { ...queued, ...patch } : queued))
+    );
+  };
+
+  const startDownload = async (item: ExportQueueItem) => {
+    if (!item.blob || downloadingRef.current.has(item.id)) return;
+    downloadingRef.current.add(item.id);
+    setItemStatus(item.id, { status: "downloading", error: undefined });
+
+    // Yield once so the "Downloading…" state paints before the browser takes over.
+    await new Promise((resolve) => window.setTimeout(resolve, 0));
     try {
       download(item.blob, item.fileName);
+      setItemStatus(item.id, { status: "started", error: undefined });
     } catch (error) {
-      setQueue((current) =>
-        current.map((queued) =>
-          queued.id === item.id
-            ? {
-                ...queued,
-                error: error instanceof Error ? error.message : "Could not start this download.",
-              }
-            : queued
-        )
-      );
-      return;
+      setItemStatus(item.id, {
+        status: "download_failed",
+        error: error instanceof Error ? error.message : "Could not start this download.",
+      });
+    } finally {
+      downloadingRef.current.delete(item.id);
     }
-    setQueue((current) =>
-      current.map((queued) =>
-        queued.id === item.id ? { ...queued, status: "started", error: undefined } : queued
-      )
-    );
   };
 
   const preparedCount = queue.filter((item) =>
@@ -212,7 +240,11 @@ export function BulkExportPanel({ records }: BulkExportPanelProps) {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <label className="text-sm text-gray-700 dark:text-gray-300">
           Format
-          <select value={format} onChange={(e) => setFormat(e.target.value as ProvenanceExportFormat)} className={inputCls}>
+          <select
+            value={format}
+            onChange={(e) => setFormat(e.target.value as ProvenanceExportFormat)}
+            className={inputCls}
+          >
             <option value="csv">CSV</option>
             <option value="json">JSON</option>
             <option value="ndjson">NDJSON (streaming)</option>
@@ -220,7 +252,11 @@ export function BulkExportPanel({ records }: BulkExportPanelProps) {
         </label>
         <label className="text-sm text-gray-700 dark:text-gray-300">
           Status
-          <select value={status} onChange={(e) => setStatus(e.target.value as typeof status)} className={inputCls}>
+          <select
+            value={status}
+            onChange={(e) => setStatus(e.target.value as typeof status)}
+            className={inputCls}
+          >
             <option value="all">All</option>
             <option value="active">Active</option>
             <option value="revoked">Revoked</option>
@@ -229,11 +265,21 @@ export function BulkExportPanel({ records }: BulkExportPanelProps) {
         </label>
         <label className="text-sm text-gray-700 dark:text-gray-300">
           Minted from
-          <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className={inputCls} />
+          <input
+            type="date"
+            value={from}
+            onChange={(e) => setFrom(e.target.value)}
+            className={inputCls}
+          />
         </label>
         <label className="text-sm text-gray-700 dark:text-gray-300">
           Minted to
-          <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className={inputCls} />
+          <input
+            type="date"
+            value={to}
+            onChange={(e) => setTo(e.target.value)}
+            className={inputCls}
+          />
         </label>
         <label className="text-sm text-gray-700 dark:text-gray-300">
           Record limit per export
@@ -251,7 +297,10 @@ export function BulkExportPanel({ records }: BulkExportPanelProps) {
           </select>
         </label>
       </div>
-      <p id="export-limit-hint" className={`text-xs ${selected.length > limit ? "text-red-700 dark:text-red-400" : "text-gray-500 dark:text-gray-400"}`}>
+      <p
+        id="export-limit-hint"
+        className={`text-xs ${selected.length > limit ? "text-red-700 dark:text-red-400" : "text-gray-500 dark:text-gray-400"}`}
+      >
         {selected.length > limit
           ? `${selected.length.toLocaleString()} records match, above the ${limit.toLocaleString()} limit. Narrow the filters or raise the limit before exporting.`
           : `${selected.length.toLocaleString()} records match. Each export must stay within the selected limit.`}
@@ -276,13 +325,17 @@ export function BulkExportPanel({ records }: BulkExportPanelProps) {
         </p>
       )}
       {queue.length > 0 && (
-        <section aria-labelledby="export-queue-heading" className="space-y-3 border-t border-gray-200 pt-4 dark:border-gray-700">
+        <section
+          aria-labelledby="export-queue-heading"
+          className="space-y-3 border-t border-gray-200 pt-4 dark:border-gray-700"
+        >
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <h3 id="export-queue-heading" className="font-semibold text-gray-900 dark:text-white">
               Download queue
             </h3>
             <p aria-live="polite" className="text-xs text-gray-500 dark:text-gray-400">
-              Prepared {preparedCount} of {queue.length} file{queue.length === 1 ? "" : "s"}; {completedCount} marked saved
+              Prepared {preparedCount} of {queue.length} file{queue.length === 1 ? "" : "s"};{" "}
+              {completedCount} marked saved
             </p>
           </div>
           <div
@@ -299,7 +352,8 @@ export function BulkExportPanel({ records }: BulkExportPanelProps) {
             />
           </div>
           <p className="text-xs text-gray-500 dark:text-gray-400">
-            Browser-managed downloads do not report disk completion or byte-level resume. Retry a part to start that file again.
+            Browser-managed downloads do not report disk completion or byte-level resume. Retry a
+            part to start that file again.
           </p>
           <ul className="divide-y divide-gray-200 dark:divide-gray-700">
             {queue.map((item) => (
@@ -308,12 +362,25 @@ export function BulkExportPanel({ records }: BulkExportPanelProps) {
                   <p className="break-all text-sm font-medium text-gray-900 dark:text-gray-100">
                     {item.fileName}
                   </p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    Part {item.part} of {item.totalParts} · {item.recordCount.toLocaleString()} records · {item.status === "started" ? "Download started" : item.status === "complete" ? "Marked saved" : item.status[0].toUpperCase() + item.status.slice(1)}
+                  <p className="text-xs text-gray-500 dark:text-gray-400" role="status">
+                    Part {item.part} of {item.totalParts} · {item.recordCount.toLocaleString()}{" "}
+                    records · {QUEUE_STATUS_LABELS[item.status]}
                   </p>
-                  {item.error && <p className="mt-1 text-xs text-red-600 dark:text-red-400">{item.error}</p>}
+                  {item.error && (
+                    <p role="alert" className="mt-1 text-xs text-red-600 dark:text-red-400">
+                      {item.error}
+                    </p>
+                  )}
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
+                  {(item.status === "failed" || item.status === "download_failed") && (
+                    <Link
+                      href={SUPPORT_HREF}
+                      className="rounded px-2.5 py-1.5 text-xs text-gray-700 underline hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
+                    >
+                      Get support
+                    </Link>
+                  )}
                   {item.status === "failed" && (
                     <button
                       type="button"
@@ -324,13 +391,25 @@ export function BulkExportPanel({ records }: BulkExportPanelProps) {
                       Retry preparation
                     </button>
                   )}
-                  {(item.status === "ready" || item.status === "started" || item.status === "complete") && (
+                  {(item.status === "ready" ||
+                    item.status === "downloading" ||
+                    item.status === "started" ||
+                    item.status === "complete" ||
+                    item.status === "download_failed") && (
                     <button
                       type="button"
-                      onClick={() => startDownload(item)}
-                      className="rounded border border-gray-300 px-2.5 py-1.5 text-xs text-gray-800 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-100 dark:hover:bg-gray-700"
+                      onClick={() => void startDownload(item)}
+                      disabled={item.status === "downloading"}
+                      aria-busy={item.status === "downloading"}
+                      className="rounded border border-gray-300 px-2.5 py-1.5 text-xs text-gray-800 hover:bg-gray-100 disabled:cursor-wait disabled:opacity-60 dark:border-gray-600 dark:text-gray-100 dark:hover:bg-gray-700"
                     >
-                      {item.status === "ready" ? "Download" : "Download again"}
+                      {item.status === "downloading"
+                        ? "Downloading…"
+                        : item.status === "ready"
+                          ? "Download"
+                          : item.status === "download_failed"
+                            ? "Retry download"
+                            : "Download again"}
                     </button>
                   )}
                   {item.status === "started" && (
@@ -350,8 +429,10 @@ export function BulkExportPanel({ records }: BulkExportPanelProps) {
                   )}
                   <button
                     type="button"
-                    onClick={() => setQueue((current) => current.filter((queued) => queued.id !== item.id))}
-                    disabled={isPreparing}
+                    onClick={() =>
+                      setQueue((current) => current.filter((queued) => queued.id !== item.id))
+                    }
+                    disabled={isPreparing || item.status === "downloading"}
                     aria-label={`Remove ${item.fileName} from queue`}
                     className="rounded px-2 py-1.5 text-xs text-gray-500 hover:bg-gray-100 disabled:opacity-50 dark:text-gray-400 dark:hover:bg-gray-700"
                   >

@@ -8,7 +8,7 @@
  * results.
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { CertificateFilterPanel } from "@/components/certificates/CertificateFilterPanel";
 import {
@@ -16,10 +16,18 @@ import {
   CertificateStatusBadge,
 } from "@/components/certificates/CertificateStatusBadge";
 import { Header } from "@/components/Header";
+import { SearchEmptyState } from "@/components/search/SearchEmptyState";
 import { Breadcrumbs } from "@/components/ui/Breadcrumbs";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { useCertificateSearch } from "@/hooks/useCertificateQueries";
+import {
+  forgetRememberedFilters,
+  hasActiveFilters,
+  loadRememberedFilters,
+  rememberFilters,
+} from "@/lib/certificateFilterMemory";
 import type { CertificateSearchFilters } from "@/services/certificateVerificationService";
+import { useWalletPublicKey } from "@/store/useWalletStore";
 
 const PAGE_SIZE = 10;
 const TABLE_COLUMNS = ["ID", "Creator", "Status", "Level", "Date"];
@@ -85,14 +93,51 @@ function download(filename: string, content: string, type: string): void {
   URL.revokeObjectURL(url);
 }
 
-export default function CertificatesPage() {
-  const [filters, setFilters] = useState<CertificateSearchFilters>({
-    offset: 0,
-    limit: PAGE_SIZE,
-  });
+const DEFAULT_FILTERS: CertificateSearchFilters = { offset: 0, limit: PAGE_SIZE };
 
-  const { data, isLoading, isError } = useCertificateSearch(filters);
+export default function CertificatesPage() {
+  // Filters are remembered per connected account (or anonymous visitor).
+  const scope = useWalletPublicKey();
+  const [filters, setFiltersState] = useState<CertificateSearchFilters>(DEFAULT_FILTERS);
+  const [restored, setRestored] = useState(false);
+
+  // Restore after mount so server and client render the same first pass.
+  useEffect(() => {
+    const remembered = loadRememberedFilters(scope);
+    if (remembered) {
+      setFiltersState({ ...remembered, offset: 0, limit: PAGE_SIZE });
+      setRestored(true);
+    } else {
+      setFiltersState(DEFAULT_FILTERS);
+      setRestored(false);
+    }
+  }, [scope]);
+
+  // Only user-initiated changes are written, so switching accounts never
+  // overwrites another account's remembered filters.
+  const setFilters = (
+    update: CertificateSearchFilters | ((prev: CertificateSearchFilters) => CertificateSearchFilters)
+  ) => {
+    const next = typeof update === "function" ? update(filters) : update;
+    setFiltersState(next);
+    setRestored(false);
+    rememberFilters(scope, next);
+  };
+
+  const clearRememberedFilters = () => {
+    forgetRememberedFilters(scope);
+    setFiltersState(DEFAULT_FILTERS);
+    setRestored(false);
+  };
+
+  const { data, isLoading, isError, isFetching, refetch } = useCertificateSearch(filters);
+  const isOffline = !useOnlineStatus();
   const result = data?.success ? data.data : undefined;
+  // A search that reports success: false is a failure, not an empty result (#912).
+  const searchFailed = isError || data?.success === false;
+  const hasActiveFilters = Object.entries(filters).some(
+    ([key, value]) => key !== "offset" && key !== "limit" && value !== undefined && value !== "",
+  );
   const certificates = result?.certificates ?? [];
   const total = result?.total ?? 0;
   const offset = filters.offset ?? 0;
@@ -124,6 +169,28 @@ export default function CertificatesPage() {
           </p>
         </div>
 
+        {restored || hasActiveFilters(filters) ? (
+          <div
+            role="status"
+            className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-800 bg-slate-900/60 px-4 py-3 text-sm text-slate-300"
+          >
+            <span>
+              {restored
+                ? "Showing filters you applied earlier in this session."
+                : "Filters are remembered for this session."}
+            </span>
+            {hasActiveFilters(filters) ? (
+              <button
+                type="button"
+                onClick={clearRememberedFilters}
+                className="rounded-md border border-slate-700 px-3 py-1.5 text-slate-200 hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+              >
+                Clear remembered filters
+              </button>
+            ) : null}
+          </div>
+        ) : null}
+
         <CertificateFilterPanel filters={filters} onChange={setFilters} />
 
         <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-6">
@@ -152,10 +219,23 @@ export default function CertificatesPage() {
           </div>
 
           {isLoading && <CertificateTableSkeleton />}
-          {isError && <p className="text-red-400">Failed to load certificates.</p>}
+          {!isLoading && searchFailed && (
+            <SearchEmptyState
+              variant="error"
+              noun="certificates"
+              offline={isOffline}
+              retrying={isFetching}
+              onRetry={() => void refetch()}
+            />
+          )}
 
-          {!isLoading && certificates.length === 0 && (
-            <p className="text-slate-400">No certificates match the current filters.</p>
+          {!isLoading && !searchFailed && certificates.length === 0 && (
+            <SearchEmptyState
+              variant="no-matches"
+              noun="certificates"
+              hasActiveFilters={hasActiveFilters}
+              onClearFilters={() => setFilters({ offset: 0, limit: PAGE_SIZE })}
+            />
           )}
 
           {certificates.length > 0 && (
