@@ -130,20 +130,6 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
     this.setState({ hasError: false, error: undefined });
   };
 
-  render() {
-    if (this.state.hasError) {
-      if (this.props.fallback) {
-        return this.props.fallback;
-      }
-
-      const described = describeError(this.state.error);
-
-      return (
-        <RetryableError
-          error={this.state.error}
-          title={described.title}
-          fallbackMessage={described.message}
-          onRetry={this.reset}
   private retrySession = () => {
     this.reset();
     if (typeof window !== "undefined") {
